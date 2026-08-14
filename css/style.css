@@ -1,0 +1,80 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #222;
+    color: #fff;
+    font-family: 'Courier New', Courier, monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#game-container {
+    position: relative;
+    width: 720px;
+}
+
+#ui-layer {
+    display: flex;
+    justify-content: space-between;
+    background-color: #111;
+    padding: 10px 20px;
+    font-size: 20px;
+    font-weight: bold;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border: 2px solid #555;
+    border-bottom: none;
+}
+
+canvas {
+    background-color: #3b8b3b; /* Cor de grama base */
+    border: 2px solid #555;
+    display: block;
+    image-rendering: pixelated; /* Para deixar o pixel art nítido */
+}
+
+.hidden {
+    display: none !important;
+}
+
+#game-over-screen {
+    position: absolute;
+    top: 50px; /* Abaixo da UI */
+    left: 0;
+    width: 100%;
+    height: 720px;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+#game-over-title {
+    font-size: 64px;
+    margin-bottom: 30px;
+    color: #ff3333;
+    text-shadow: 2px 2px 0 #000;
+}
+
+#restart-btn {
+    padding: 15px 30px;
+    font-size: 24px;
+    font-family: inherit;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#restart-btn:hover {
+    background-color: #45a049;
+}
