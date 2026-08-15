@@ -98,7 +98,7 @@
                                 <div class="char-card-info">
                                     <span class="char-name">BOMBERMAN</span>
                                     <span class="char-tag tag-classic">CLÁSSICO</span>
-                                    <div class="char-stat-mini">⚡ Vel: 3.2 • 🔥 Raio: 2</div>
+                                    <div class="char-stat-mini">⚡ Vel: 2.6 • 🔥 Raio: 2</div>
                                 </div>
                                 <div class="char-selected-check">✓</div>
                             </div>
@@ -110,7 +110,19 @@
                                 <div class="char-card-info">
                                     <span class="char-name">NARUTO NINJA</span>
                                     <span class="char-tag tag-ninja">ÁGIL (+VEL)</span>
-                                    <div class="char-stat-mini">⚡ Vel: 3.5 • 🔥 Raio: 2</div>
+                                    <div class="char-stat-mini">⚡ Vel: 2.8 • 🔥 Raio: 2</div>
+                                </div>
+                                <div class="char-selected-check">✓</div>
+                            </div>
+
+                            <div class="char-card" data-char="hero_sasuke" id="char-card-sasuke">
+                                <div class="char-avatar-wrapper avatar-sasuke">
+                                    <span class="char-emoji">⚡</span>
+                                </div>
+                                <div class="char-card-info">
+                                    <span class="char-name">SASUKE UCHIHA</span>
+                                    <span class="char-tag tag-lightning">CHIDORI (RAIO)</span>
+                                    <div class="char-stat-mini">⚡ Vel: 2.9 • 🔥 Raio: 2</div>
                                 </div>
                                 <div class="char-selected-check">✓</div>
                             </div>
@@ -140,7 +152,7 @@
                     </div>
 
                     <div class="menu-footer">
-                        <span>Pressione as setas ou WASD para mover • ESPAÇO para plantar bombas</span>
+                        <span>Ande contra uma bomba para 🦵 Chutá-la • ESPAÇO: Bomba • [Z]: Poder Especial</span>
                     </div>
                 </div>
             </div>
@@ -166,8 +178,12 @@
                                 <span>Plantar Bomba</span>
                             </div>
                             <div class="key-item">
+                                <div class="key-caps"><kbd>Andar contra Bomba</kbd></div>
+                                <span>🦵 <strong>Chute de Bomba (Bomb Kick):</strong> Desliza a bomba pelo corredor até bater em obstáculos!</span>
+                            </div>
+                            <div class="key-item">
                                 <div class="key-caps"><kbd>Z</kbd></div>
-                                <span>Disparar Rasengan (Destrói caixas em linha reta!)</span>
+                                <span><strong>Jutsu Especial:</strong> Dispara 🌀 <em>Rasengan</em> (Naruto) ou ⚡ <em>Chidori</em> (Sasuke) furando caixas em linha reta!</span>
                             </div>
                         </div>
                     </div>
@@ -176,8 +192,8 @@
                         <h3>🎯 Objetivo das Fases</h3>
                         <ul class="guide-list">
                             <li><strong>Fases 1 e 2:</strong> Destrua os tijolos para encontrar a <span class="highlight-gold">🔑 Chave</span> ou derrote os monstros que a carregam. Depois, encontre a <span class="highlight-blue">🚪 Porta Secreta</span> para avançar!</li>
-                            <li><strong>Poder Secreto:</strong> Encontre o <span class="highlight-blue">🌀 Rasengan</span> (máx 2 por mapa) e aperte <strong>Z</strong> para furar todas as caixas de uma linha inteira!</li>
-                            <li><strong>Fase 3:</strong> Enfrente o temível <strong>👑 Mech Boss</strong>! Desvie dos seus ataques e use suas bombas e Rasengan estrategicamente!</li>
+                            <li><strong>Chakra Secreto:</strong> Encontre as esferas de Chakra (máx 2 por mapa) e aperte <strong>Z</strong> para limpar fileiras inteiras de caixas e monstros!</li>
+                            <li><strong>Fase 3:</strong> Enfrente o temível <strong>👑 Mech Boss</strong>! Use o Chute de Bombas e seu Jutsu especial estrategicamente!</li>
                         </ul>
                     </div>
                 </div>
@@ -313,6 +329,7 @@
     <script src="js/Entity.js"></script>
     <script src="js/Bomb.js"></script>
     <script src="js/Rasengan.js"></script>
+    <script src="js/Chidori.js"></script>
     <script src="js/Player.js"></script>
     <script src="js/Enemy.js"></script>
     <script src="js/Boss.js"></script>

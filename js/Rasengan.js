@@ -53,8 +53,9 @@ class RasenganProjectile {
         }
 
         // Move o projétil
-        this.x += this.vx;
-        this.y += this.vy;
+        const timeScale = Math.min(dt || 16.6667, 50) / 16.6667;
+        this.x += this.vx * timeScale;
+        this.y += this.vy * timeScale;
 
         // Checa limites do mapa
         const centerX = this.x + this.width / 2;

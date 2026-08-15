@@ -32,8 +32,8 @@ class Enemy extends Entity {
             case CONSTANTS.ENEMY_TYPES.ONEAL: // Slime Azul: Rápido, BFS e esquiva
                 this.spriteKey = 'enemy_blue';
                 this.color = '#2196f3';
-                this.baseSpeed = 1.7;
-                this.speed = 1.7;
+                this.baseSpeed = 1.0;
+                this.speed = 1.0;
                 this.hp = 1;
                 this.maxHp = 1;
                 this.scoreValue = 200;
@@ -43,8 +43,8 @@ class Enemy extends Entity {
             case CONSTANTS.ENEMY_TYPES.DAHL: // Golem Laranja: Tanque com 2 HP e investida
                 this.spriteKey = 'enemy_orange';
                 this.color = '#ff9800';
-                this.baseSpeed = 1.15;
-                this.speed = 1.15;
+                this.baseSpeed = 0.75;
+                this.speed = 0.75;
                 this.hp = 2;
                 this.maxHp = 2;
                 this.scoreValue = 350;
@@ -54,21 +54,21 @@ class Enemy extends Entity {
             case CONSTANTS.ENEMY_TYPES.MINVO: // Morcego Roxo: Flutua através de tijolos
                 this.spriteKey = 'enemy_purple';
                 this.color = '#ab47bc';
-                this.baseSpeed = 1.35;
-                this.speed = 1.35;
+                this.baseSpeed = 0.85;
+                this.speed = 0.85;
                 this.hp = 1;
                 this.maxHp = 1;
                 this.scoreValue = 300;
                 this.canPassSoftWalls = true;
                 break;
 
-            case CONSTANTS.ENEMY_TYPES.BALLOM: // Balão Vermelho: Clássico, patrulha ágil
+            case CONSTANTS.ENEMY_TYPES.BALLOM: // Balão Vermelho: Clássico, patrulha
             default:
                 this.type = CONSTANTS.ENEMY_TYPES.BALLOM;
                 this.spriteKey = 'enemy';
                 this.color = '#ff3333';
-                this.baseSpeed = 1.35;
-                this.speed = 1.35;
+                this.baseSpeed = 0.85;
+                this.speed = 0.85;
                 this.hp = 1;
                 this.maxHp = 1;
                 this.scoreValue = 100;
@@ -306,7 +306,7 @@ class Enemy extends Entity {
         // Verifica se há linha reta direta e desobstruída com o jogador
         if (this.hasLineOfSight(col, row, playerGrid.col, playerGrid.row, map)) {
             this.isCharging = true;
-            this.speed = 2.4; // Aceleração durante investida
+            this.speed = 1.35; // Aceleração equilibrada durante investida
 
             const dx = playerGrid.col - col;
             const dy = playerGrid.row - row;
@@ -440,8 +440,10 @@ class Enemy extends Entity {
     executeMovement(dt, map) {
         if (!this.direction) return;
 
-        this.vx = this.direction.vx * this.speed;
-        this.vy = this.direction.vy * this.speed;
+        const timeScale = Math.min(dt || 16.6667, 50) / 16.6667;
+
+        this.vx = this.direction.vx * this.speed * timeScale;
+        this.vy = this.direction.vy * this.speed * timeScale;
 
         // Movimento no eixo X
         this.x += this.vx;

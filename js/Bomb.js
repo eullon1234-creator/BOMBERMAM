@@ -13,6 +13,11 @@ class Bomb {
         this.exploded = false;
         this.toBeRemoved = false;
         
+        // Propriedades do Chute de Bomba (Bomb Kick)
+        this.isSliding = false;
+        this.slideDir = null; // 'up', 'down', 'left', 'right'
+        this.slideSpeed = 4.8; // Velocidade natural de deslizamento ao chutar
+        
         this.blasts = [];
         this.animTimer = 0;
         this.animFrame = 0;
@@ -24,7 +29,65 @@ class Bomb {
         }
     }
 
-    update(dt, map) {
+    kick(dir, map, bombsArray, enemies, boss) {
+        if (this.exploded || this.toBeRemoved) return false;
+        
+        // Checa se o próximo tile na direção do chute está livre
+        let nextCol = this.col;
+        let nextRow = this.row;
+        if (dir === 'left') nextCol--;
+        else if (dir === 'right') nextCol++;
+        else if (dir === 'up') nextRow--;
+        else if (dir === 'down') nextRow++;
+
+        if (nextCol < 0 || nextCol >= CONSTANTS.GRID_WIDTH || nextRow < 0 || nextRow >= CONSTANTS.GRID_HEIGHT) {
+            return false;
+        }
+
+        const nextTile = map.grid[nextRow][nextCol];
+        if (nextTile === CONSTANTS.TILE_SOLID || nextTile === CONSTANTS.TILE_SOFT) {
+            return false;
+        }
+
+        // Checa se já tem outra bomba lá
+        if (bombsArray) {
+            for (let b of bombsArray) {
+                if (b !== this && !b.exploded && !b.toBeRemoved && b.col === nextCol && b.row === nextRow) {
+                    return false;
+                }
+            }
+        }
+
+        this.isSliding = true;
+        this.slideDir = dir;
+
+        // Libera o tile atual no grid enquanto desliza
+        if (map.grid[this.row][this.col] === CONSTANTS.TILE_BOMB) {
+            map.grid[this.row][this.col] = CONSTANTS.TILE_EMPTY;
+        }
+
+        if (window.soundManager) {
+            window.soundManager.playBombKick();
+        }
+        return true;
+    }
+
+    stopSliding(map) {
+        this.isSliding = false;
+        this.slideDir = null;
+        
+        // Alinha perfeitamente ao grid
+        this.col = Math.max(0, Math.min(CONSTANTS.GRID_WIDTH - 1, Math.round(this.x / CONSTANTS.TILE_SIZE)));
+        this.row = Math.max(0, Math.min(CONSTANTS.GRID_HEIGHT - 1, Math.round(this.y / CONSTANTS.TILE_SIZE)));
+        this.x = this.col * CONSTANTS.TILE_SIZE;
+        this.y = this.row * CONSTANTS.TILE_SIZE;
+
+        if (!this.exploded && map.grid[this.row][this.col] === CONSTANTS.TILE_EMPTY) {
+            map.grid[this.row][this.col] = CONSTANTS.TILE_BOMB;
+        }
+    }
+
+    update(dt, map, bombsArray, enemies, boss) {
         this.animTimer += dt;
         if (this.animTimer > 100) {
             this.animFrame = (this.animFrame + 1) % 4;
@@ -35,6 +98,80 @@ class Bomb {
         for (let entity of this.overlappingEntities) {
             if (!entity.isAlive || !this.intersects(entity)) {
                 this.overlappingEntities.delete(entity);
+            }
+        }
+
+        // Movimento de deslizamento (Kick)
+        if (this.isSliding && !this.exploded) {
+            const timeScale = Math.min(dt || 16.6667, 50) / 16.6667;
+            let vx = 0;
+            let vy = 0;
+            if (this.slideDir === 'left') vx = -this.slideSpeed * timeScale;
+            else if (this.slideDir === 'right') vx = this.slideSpeed * timeScale;
+            else if (this.slideDir === 'up') vy = -this.slideSpeed * timeScale;
+            else if (this.slideDir === 'down') vy = this.slideSpeed * timeScale;
+
+            this.x += vx;
+            this.y += vy;
+
+            // Atualiza col/row aproximados
+            this.col = Math.max(0, Math.min(CONSTANTS.GRID_WIDTH - 1, Math.round(this.x / CONSTANTS.TILE_SIZE)));
+            this.row = Math.max(0, Math.min(CONSTANTS.GRID_HEIGHT - 1, Math.round(this.y / CONSTANTS.TILE_SIZE)));
+
+            // Checagem de colisão frontal durante o deslizamento
+            let checkX = this.x + this.width / 2;
+            let checkY = this.y + this.height / 2;
+            if (this.slideDir === 'right') checkX = this.x + this.width + 1;
+            else if (this.slideDir === 'left') checkX = this.x - 1;
+            else if (this.slideDir === 'down') checkY = this.y + this.height + 1;
+            else if (this.slideDir === 'up') checkY = this.y - 1;
+
+            const checkCol = Math.floor(checkX / CONSTANTS.TILE_SIZE);
+            const checkRow = Math.floor(checkY / CONSTANTS.TILE_SIZE);
+
+            let hitObstacle = false;
+
+            // Limites da arena
+            if (checkCol < 0 || checkCol >= CONSTANTS.GRID_WIDTH || checkRow < 0 || checkRow >= CONSTANTS.GRID_HEIGHT) {
+                hitObstacle = true;
+            } else {
+                const tile = map.grid[checkRow][checkCol];
+                if (tile === CONSTANTS.TILE_SOLID || tile === CONSTANTS.TILE_SOFT) {
+                    // Checa se a ponta da bomba já tocou o bloco
+                    if (this.slideDir === 'right' && this.x + this.width >= checkCol * CONSTANTS.TILE_SIZE) hitObstacle = true;
+                    else if (this.slideDir === 'left' && this.x <= (checkCol + 1) * CONSTANTS.TILE_SIZE) hitObstacle = true;
+                    else if (this.slideDir === 'down' && this.y + this.height >= checkRow * CONSTANTS.TILE_SIZE) hitObstacle = true;
+                    else if (this.slideDir === 'up' && this.y <= (checkRow + 1) * CONSTANTS.TILE_SIZE) hitObstacle = true;
+                }
+            }
+
+            // Colisão com outras bombas
+            if (bombsArray) {
+                for (let b of bombsArray) {
+                    if (b !== this && !b.exploded && !b.toBeRemoved) {
+                        if (this.intersects(b)) {
+                            hitObstacle = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Colisão com Inimigos / Boss
+            if (enemies) {
+                for (let e of enemies) {
+                    if (e.isAlive && this.intersects(e)) {
+                        hitObstacle = true;
+                        break;
+                    }
+                }
+            }
+            if (boss && boss.isAlive && this.intersects(boss)) {
+                hitObstacle = true;
+            }
+
+            if (hitObstacle) {
+                this.stopSliding(map);
             }
         }
 
@@ -51,6 +188,9 @@ class Bomb {
 
         this.timer -= dt;
         if (this.timer <= 0) {
+            if (this.isSliding) {
+                this.stopSliding(map);
+            }
             this.explode(map);
         }
     }

@@ -11,6 +11,7 @@ class Game {
         this.boss = null;
         this.bombs = [];
         this.rasengans = [];
+        this.chidoris = [];
         
         this.level = 1;
         this.score = 0;
@@ -199,7 +200,7 @@ class Game {
         this.level = 1;
 
         // Inicializa os atributos acumulados para a jornada (persistem entre fases)
-        const baseSpeed = (this.selectedCharacter === 'hero_naruto') ? 3.5 : 3.2;
+        const baseSpeed = (this.selectedCharacter === 'hero_sasuke') ? 2.9 : (this.selectedCharacter === 'hero_naruto') ? 2.8 : 2.6;
         this.playerStats = {
             bombCapacity: 1,
             bombRadius: 2,
@@ -291,6 +292,7 @@ class Game {
         this.enemies = [];
         this.bombs = [];
         this.rasengans = [];
+        this.chidoris = [];
         this.boss = null;
         
         if (levelNum === 1) {
@@ -359,8 +361,26 @@ class Game {
         const powerShieldEl = document.getElementById('hud-power-shield');
         
         if (charEl) {
-            charEl.innerText = this.selectedCharacter === 'hero_naruto' ? '🍥 Naruto' : '💣 Bomberman';
+            if (this.selectedCharacter === 'hero_sasuke') {
+                charEl.innerText = '⚡ Sasuke';
+            } else if (this.selectedCharacter === 'hero_naruto') {
+                charEl.innerText = '🍥 Naruto';
+            } else {
+                charEl.innerText = '💣 Bomberman';
+            }
         }
+
+        // Atualiza rótulo e ícone dinâmico do jutsu no HUD
+        const isSasuke = (this.selectedCharacter === 'hero_sasuke');
+        const specialTextEl = document.querySelector('#hud-stat-rasengan .power-text');
+        const specialIconEl = document.querySelector('#hud-stat-rasengan .power-icon');
+        if (specialTextEl) {
+            specialTextEl.innerText = isSasuke ? 'Chidori:' : 'Rasengan:';
+        }
+        if (specialIconEl) {
+            specialIconEl.innerText = isSasuke ? '⚡' : '🌀';
+        }
+
         if (scoreEl) scoreEl.innerText = `Score: ${this.score}`;
         if (levelEl) levelEl.innerText = `Fase: ${this.level}${this.level === 3 ? ' (BOSS)' : ''}`;
         if (livesEl) livesEl.innerText = `❤️ ${this.lives}`;
@@ -423,7 +443,11 @@ class Game {
                     this.player.rasenganAmmo = (this.player.rasenganAmmo || 0) + 1;
                     if (this.playerStats) this.playerStats.rasenganAmmo = this.player.rasenganAmmo;
                     this.score += 250;
-                    window.soundManager?.playRasenganCollect();
+                    if (this.selectedCharacter === 'hero_sasuke') {
+                        window.soundManager?.playChidoriZap();
+                    } else {
+                        window.soundManager?.playRasenganCollect();
+                    }
                 } else {
                     window.soundManager?.playPowerUp();
                     if (p.type === 'bomb') {
@@ -435,7 +459,7 @@ class Game {
                         if (this.playerStats) this.playerStats.bombRadius = this.player.bombRadius;
                         this.score += 100;
                     } else if (p.type === 'speed') {
-                        this.player.speed = Math.min(5.5, +(this.player.speed + 0.35).toFixed(2));
+                        this.player.speed = Math.min(4.0, +(this.player.speed + 0.25).toFixed(2));
                         this.player.speedLevel = (this.player.speedLevel || 1) + 1;
                         if (this.playerStats) {
                             this.playerStats.speed = this.player.speed;
@@ -556,7 +580,7 @@ class Game {
                     titleEl.style.color = "#ff3333";
                 }
                 if (scoreValEl) {
-                    scoreValVal: scoreValEl.innerText = this.score;
+                    scoreValEl.innerText = this.score;
                 }
                 document.getElementById('game-over-screen').classList.remove('hidden');
             }, 700);
@@ -606,7 +630,7 @@ class Game {
 
     loop(timestamp) {
         if (!this.lastTime) this.lastTime = timestamp;
-        const dt = timestamp - this.lastTime;
+        const dt = Math.min(timestamp - this.lastTime, 50);
         this.lastTime = timestamp;
 
         if (this.state === CONSTANTS.STATE_PLAYING && this.isLoaded) {
@@ -632,6 +656,16 @@ class Game {
             }
         }
 
+        // Atualiza Projéteis do Chidori
+        if (this.chidoris) {
+            for (let i = this.chidoris.length - 1; i >= 0; i--) {
+                this.chidoris[i].update(dt, this.map, this.enemies, this.boss, this);
+                if (this.chidoris[i].toBeRemoved) {
+                    this.chidoris.splice(i, 1);
+                }
+            }
+        }
+
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             this.enemies[i].update(dt, this.map, this.player, this.bombs);
             if (this.enemies[i].toBeRemoved) {
@@ -644,7 +678,7 @@ class Game {
         }
 
         for (let i = this.bombs.length - 1; i >= 0; i--) {
-            this.bombs[i].update(dt, this.map);
+            this.bombs[i].update(dt, this.map, this.bombs, this.enemies, this.boss);
             if (this.bombs[i].toBeRemoved) {
                 this.bombs.splice(i, 1);
             }
@@ -673,6 +707,13 @@ class Game {
         // Projéteis Rasengan em voo
         for (let rasengan of this.rasengans) {
             rasengan.draw(this.ctx, this.spriteLoader);
+        }
+
+        // Projéteis Chidori em voo
+        if (this.chidoris) {
+            for (let chidori of this.chidoris) {
+                chidori.draw(this.ctx);
+            }
         }
 
         // Inimigos

@@ -6,7 +6,7 @@ class Boss extends Entity {
         this.maxHp = 12;
         this.state = 'idle'; // 'idle', 'moving', 'charging', 'damage', 'dead'
         this.stateTimer = 1500;
-        this.speed = 1.6;
+        this.speed = 0.9;
         
         this.animFrame = 0;
         this.animTimer = 0;
@@ -34,7 +34,7 @@ class Boss extends Entity {
         }
 
         if (this.state === 'moving') {
-            this.moveTowards(player, map);
+            this.moveTowards(player, map, dt);
         }
     }
 
@@ -65,14 +65,16 @@ class Boss extends Entity {
         }
     }
 
-    moveTowards(target, map) {
+    moveTowards(target, map, dt = 16.6667) {
         const dx = (target.x + target.width/2) - (this.x + this.width/2);
         const dy = (target.y + target.height/2) - (this.y + this.height/2);
         const length = Math.sqrt(dx*dx + dy*dy);
         if (length === 0) return;
 
-        this.vx = (dx / length) * this.speed;
-        this.vy = (dy / length) * this.speed;
+        const timeScale = Math.min(dt, 50) / 16.6667;
+
+        this.vx = (dx / length) * this.speed * timeScale;
+        this.vy = (dy / length) * this.speed * timeScale;
 
         this.x += this.vx;
         if (this.checkCollisionWithWalls(map)) this.x -= this.vx;
