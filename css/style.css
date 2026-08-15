@@ -22,14 +22,46 @@ body {
 #ui-layer {
     display: flex;
     justify-content: space-between;
-    background-color: #111;
-    padding: 10px 20px;
-    font-size: 20px;
+    align-items: center;
+    background: linear-gradient(180deg, #1f232b 0%, #13171e 100%);
+    padding: 12px 20px;
+    font-size: 16px;
     font-weight: bold;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    border: 2px solid #555;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border: 2px solid #3e4856;
     border-bottom: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    letter-spacing: 0.5px;
+}
+
+.key-status {
+    color: #ffca28;
+    background: rgba(255, 202, 40, 0.15);
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 202, 40, 0.3);
+}
+
+.key-found {
+    color: #00e676 !important;
+    background: rgba(0, 230, 118, 0.2) !important;
+    border-color: #00e676 !important;
+    animation: pulse 1s infinite alternate;
+}
+
+#shield-display {
+    color: #29b6f6;
+    background: rgba(41, 182, 246, 0.2);
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #29b6f6;
+    animation: pulse 0.8s infinite alternate;
+}
+
+@keyframes pulse {
+    from { transform: scale(1); opacity: 0.9; }
+    to { transform: scale(1.05); opacity: 1; }
 }
 
 canvas {

@@ -49,8 +49,10 @@ class Boss extends Entity {
             this.state = 'charging';
             this.stateTimer = 1800;
             // Invoca minions se houver poucos
-            if (enemiesArray && enemiesArray.filter(e => e.isAlive).length < 2) {
-                enemiesArray.push(new Enemy(this.x, this.y, 2));
+            if (enemiesArray && enemiesArray.filter(e => e.isAlive).length < 3) {
+                const types = [CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.MINVO, CONSTANTS.ENEMY_TYPES.DAHL];
+                const chosenType = types[Math.floor(Math.random() * types.length)];
+                enemiesArray.push(new Enemy(this.x, this.y, chosenType));
             }
         } else {
             this.state = 'idle';

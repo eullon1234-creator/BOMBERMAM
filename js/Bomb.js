@@ -104,8 +104,13 @@ class Bomb {
                 if (tile === CONSTANTS.TILE_SOFT) {
                     map.grid[targetRow][targetCol] = CONSTANTS.TILE_EMPTY;
                     this.blasts.push({ col: targetCol, row: targetRow, type: blastType });
-                    if (Math.random() < 0.4 && map.spawnPowerUp) {
-                        map.spawnPowerUp(targetCol, targetRow);
+                    if (map.spawnPowerUp) {
+                        // Verifica se este bloco continha a chave secreta
+                        if (map.keyInCrate && map.keyInCrate.col === targetCol && map.keyInCrate.row === targetRow) {
+                            map.spawnPowerUp(targetCol, targetRow, 'key');
+                        } else if (Math.random() < 0.70) {
+                            map.spawnPowerUp(targetCol, targetRow);
+                        }
                     }
                     break;
                 }

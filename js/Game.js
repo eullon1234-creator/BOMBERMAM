@@ -73,29 +73,50 @@ class Game {
         this.boss = null;
         
         if (levelNum === 1) {
-            this.spawnEnemies(3, 1);
+            // Fase 1: Introdução com Balloms e 1 Oneal esperto
+            this.spawnEnemyList([
+                CONSTANTS.ENEMY_TYPES.BALLOM,
+                CONSTANTS.ENEMY_TYPES.BALLOM,
+                CONSTANTS.ENEMY_TYPES.ONEAL
+            ]);
         } else if (levelNum === 2) {
-            this.spawnEnemies(4, 2);
+            // Fase 2: Desafio com variedade tática completa
+            this.spawnEnemyList([
+                CONSTANTS.ENEMY_TYPES.BALLOM,
+                CONSTANTS.ENEMY_TYPES.ONEAL,
+                CONSTANTS.ENEMY_TYPES.ONEAL,
+                CONSTANTS.ENEMY_TYPES.DAHL,
+                CONSTANTS.ENEMY_TYPES.MINVO
+            ]);
         } else if (levelNum === 3) {
             const centerX = Math.floor(CONSTANTS.GRID_WIDTH / 2) * CONSTANTS.TILE_SIZE;
             const centerY = Math.floor(CONSTANTS.GRID_HEIGHT / 2) * CONSTANTS.TILE_SIZE;
             this.boss = new Boss(centerX, centerY);
         }
+
+        // Se a chave não estiver escondida numa caixa, atribui a um dos inimigos
+        if (levelNum < 3 && !this.map.keyInCrate && this.enemies.length > 0) {
+            const chosenEnemy = this.enemies[Math.floor(Math.random() * this.enemies.length)];
+            chosenEnemy.hasKey = true;
+        }
         
         this.updateUI();
     }
 
-    spawnEnemies(count, enemyLevel) {
-        let spawned = 0;
-        let attempts = 0;
-        while (spawned < count && attempts < 100) {
-            attempts++;
-            let col = Math.floor(Math.random() * CONSTANTS.GRID_WIDTH);
-            let row = Math.floor(Math.random() * CONSTANTS.GRID_HEIGHT);
-            
-            if (col > 3 && row > 3 && this.map.grid[row][col] === CONSTANTS.TILE_EMPTY) {
-                this.enemies.push(new Enemy(col * CONSTANTS.TILE_SIZE, row * CONSTANTS.TILE_SIZE, enemyLevel));
-                spawned++;
+    spawnEnemyList(typeList) {
+        for (let type of typeList) {
+            let spawned = false;
+            let attempts = 0;
+            while (!spawned && attempts < 100) {
+                attempts++;
+                let col = Math.floor(Math.random() * CONSTANTS.GRID_WIDTH);
+                let row = Math.floor(Math.random() * CONSTANTS.GRID_HEIGHT);
+                
+                // Garante que não nasça muito perto do jogador (área inicial 3x3)
+                if ((col > 3 || row > 3) && this.map.grid[row][col] === CONSTANTS.TILE_EMPTY) {
+                    this.enemies.push(new Enemy(col * CONSTANTS.TILE_SIZE, row * CONSTANTS.TILE_SIZE, type));
+                    spawned = true;
+                }
             }
         }
     }
@@ -104,10 +125,37 @@ class Game {
         const scoreEl = document.getElementById('score-display');
         const levelEl = document.getElementById('level-display');
         const livesEl = document.getElementById('lives-display');
+        const keyEl = document.getElementById('key-display');
+        const shieldEl = document.getElementById('shield-display');
         
         if (scoreEl) scoreEl.innerText = `Score: ${this.score}`;
         if (levelEl) levelEl.innerText = `Fase: ${this.level}${this.level === 3 ? ' (BOSS)' : ''}`;
         if (livesEl) livesEl.innerText = `Vidas: ${this.lives}`;
+
+        if (keyEl) {
+            if (this.level === 3) {
+                keyEl.innerText = "👑 Derrote o Chefe!";
+                keyEl.classList.remove("key-found");
+            } else if (this.player && this.player.hasKey) {
+                keyEl.innerText = "🔑 Chave: ✅ PORTAL ABERTO!";
+                keyEl.classList.add("key-found");
+            } else {
+                keyEl.innerText = "🔑 Chave: ❌ Procure!";
+                keyEl.classList.remove("key-found");
+            }
+        }
+
+        if (shieldEl && this.player) {
+            if (this.player.hasShield) {
+                shieldEl.classList.remove("hidden");
+                shieldEl.innerText = `🛡️ Escudo (${Math.ceil(this.player.shieldTimer / 1000)}s)`;
+            } else if (this.player.spawnShieldTimer > 0) {
+                shieldEl.classList.remove("hidden");
+                shieldEl.innerText = "🛡️ Imunidade!";
+            } else {
+                shieldEl.classList.add("hidden");
+            }
+        }
     }
 
     checkPowerUpCollection() {
@@ -118,13 +166,28 @@ class Game {
         for (let i = this.map.powerUps.length - 1; i >= 0; i--) {
             const p = this.map.powerUps[i];
             if (p.col === playerGrid.col && p.row === playerGrid.row) {
-                // Aplica efeito
-                if (p.type === 'bomb') this.player.bombCapacity++;
-                else if (p.type === 'fire') this.player.bombRadius++;
-                else if (p.type === 'speed') this.player.speed = Math.min(5, this.player.speed + 0.5);
-                else if (p.type === 'heart') { this.lives++; this.updateUI(); }
+                // Aplica efeito do item coletado
+                if (p.type === 'bomb') {
+                    this.player.bombCapacity++;
+                    this.score += 100;
+                } else if (p.type === 'fire') {
+                    this.player.bombRadius++;
+                    this.score += 100;
+                } else if (p.type === 'speed') {
+                    this.player.speed = Math.min(5.2, this.player.speed + 0.45);
+                    this.score += 100;
+                } else if (p.type === 'heart') {
+                    this.lives++;
+                    this.score += 200;
+                } else if (p.type === 'shield') {
+                    this.player.hasShield = true;
+                    this.player.shieldTimer = 10000; // 10s de proteção
+                    this.score += 150;
+                } else if (p.type === 'key') {
+                    this.player.hasKey = true;
+                    this.score += 300;
+                }
 
-                this.score += 50;
                 this.updateUI();
                 this.map.powerUps.splice(i, 1);
             }
@@ -134,16 +197,20 @@ class Game {
     checkCollisions() {
         if (!this.player || !this.player.isAlive) return;
 
+        const isPlayerInvulnerable = this.player.hasShield || this.player.spawnShieldTimer > 0;
+
         // Player vs Enemy
-        for (let enemy of this.enemies) {
-            if (enemy.isAlive && this.player.checkCollision(enemy)) {
-                this.killPlayer();
-                return;
+        if (!isPlayerInvulnerable) {
+            for (let enemy of this.enemies) {
+                if (enemy.isAlive && this.player.checkCollision(enemy)) {
+                    this.killPlayer();
+                    return;
+                }
             }
         }
         
         // Player vs Boss
-        if (this.boss && this.boss.isAlive && this.player.checkCollision(this.boss)) {
+        if (!isPlayerInvulnerable && this.boss && this.boss.isAlive && this.player.checkCollision(this.boss)) {
             this.killPlayer();
             return;
         }
@@ -159,25 +226,29 @@ class Game {
                         height: CONSTANTS.TILE_SIZE
                     };
 
-                    // Destrói power-ups atingidos
+                    // Destrói power-ups atingidos (apenas se não estiverem com imunidade de spawn e não forem chaves)
                     for (let pIdx = this.map.powerUps.length - 1; pIdx >= 0; pIdx--) {
                         const p = this.map.powerUps[pIdx];
                         if (p.col === blast.col && p.row === blast.row) {
-                            this.map.powerUps.splice(pIdx, 1);
+                            if (p.immunityTimer <= 0 && p.type !== 'key') {
+                                this.map.powerUps.splice(pIdx, 1);
+                            }
                         }
                     }
 
                     // Player Hit
-                    if (this.player.checkCollision(blastHitbox)) {
+                    if (!isPlayerInvulnerable && this.player.checkCollision(blastHitbox)) {
                         this.killPlayer();
                     }
 
                     // Enemy Hit
                     for (let enemy of this.enemies) {
                         if (enemy.isAlive && enemy.checkCollision(blastHitbox)) {
-                            enemy.isAlive = false;
-                            this.score += 150 * enemy.level;
-                            this.updateUI();
+                            const isDead = enemy.takeDamage(1, this.map);
+                            if (isDead) {
+                                this.score += enemy.scoreValue || (150 * enemy.level);
+                                this.updateUI();
+                            }
                         }
                     }
                     
@@ -225,10 +296,16 @@ class Game {
 
     checkLevelClear() {
         if (this.level < 3) {
-            const enemiesAlive = this.enemies.filter(e => e.isAlive).length;
-            if (enemiesAlive === 0) {
-                this.level++;
-                this.initLevel(this.level);
+            // Em fases 1 e 2, para avançar precisa pegar a chave e entrar na porta revelada!
+            if (this.map.door && (this.map.door.isRevealed || this.map.grid[this.map.door.row][this.map.door.col] === CONSTANTS.TILE_EMPTY)) {
+                const playerGrid = this.player.getGridPos();
+                if (playerGrid.col === this.map.door.col && playerGrid.row === this.map.door.row) {
+                    if (this.player.hasKey) {
+                        this.score += 500;
+                        this.level++;
+                        this.initLevel(this.level);
+                    }
+                }
             }
         } else if (this.level === 3) {
             if (this.boss && !this.boss.isAlive && this.boss.deathTimer > 1500) {
@@ -258,12 +335,14 @@ class Game {
     }
 
     update(dt) {
+        this.map.update(dt);
+
         if (this.player) {
             this.player.update(dt, this.map, this.bombs);
         }
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
-            this.enemies[i].update(dt, this.map, this.player);
+            this.enemies[i].update(dt, this.map, this.player, this.bombs);
             if (this.enemies[i].toBeRemoved) {
                 this.enemies.splice(i, 1);
             }
@@ -282,6 +361,7 @@ class Game {
 
         this.checkCollisions();
         this.checkPowerUpCollection();
+        this.updateUI();
         
         if (this.player && this.player.isAlive) {
             this.checkLevelClear();
@@ -291,8 +371,8 @@ class Game {
     draw() {
         this.ctx.clearRect(0, 0, CONSTANTS.CANVAS_WIDTH, CONSTANTS.CANVAS_HEIGHT);
 
-        // Cenário e Tiles
-        this.map.draw(this.ctx, this.spriteLoader, this.level);
+        // Cenário, Porta e Tiles
+        this.map.draw(this.ctx, this.spriteLoader, this.level, this.player);
 
         // Bombas e Explosões
         for (let bomb of this.bombs) {

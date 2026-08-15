@@ -26,10 +26,14 @@ class SpriteLoader {
         const list = [
             { name: 'hero', src: 'assets/hero.jpg' },
             { name: 'enemy', src: 'assets/enemy.jpg' },
+            { name: 'enemy_blue', src: 'assets/enemy_blue.jpg' },
+            { name: 'enemy_orange', src: 'assets/enemy_orange.jpg' },
+            { name: 'enemy_purple', src: 'assets/enemy_purple.jpg' },
             { name: 'boss', src: 'assets/boss.jpg' },
             { name: 'bomb_explosion', src: 'assets/bomb_explosion.jpg' },
             { name: 'tileset', src: 'assets/tileset.jpg' },
-            { name: 'items', src: 'assets/items.jpg' }
+            { name: 'items', src: 'assets/items.jpg' },
+            { name: 'door_and_key', src: 'assets/door_and_key.jpg' }
         ];
 
         for (let item of list) {

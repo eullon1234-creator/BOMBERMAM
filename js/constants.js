@@ -27,5 +27,13 @@ const CONSTANTS = {
     STATE_PLAYING: 1,
     STATE_GAME_OVER: 2,
     STATE_LEVEL_CLEAR: 3,
-    STATE_VICTORY: 4
+    STATE_VICTORY: 4,
+
+    // Tipos de Inimigos
+    ENEMY_TYPES: {
+        BALLOM: 'ballom',   // Balão Vermelho: Patrulha clássica e rápida
+        ONEAL: 'oneal',     // Slime Azul: Perseguidor com BFS e esquiva de bombas
+        DAHL: 'dahl',       // Golem Laranja: Tanque com 2 HP e investida
+        MINVO: 'minvo'      // Morcego Roxo: Flutua e atravessa blocos de tijolo
+    }
 };
