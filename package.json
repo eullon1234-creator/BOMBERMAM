@@ -1,0 +1,13 @@
+{
+  "name": "bomberman-game",
+  "version": "1.0.0",
+  "description": "Bomberman HTML5 Canvas Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["bomberman", "game", "canvas"],
+  "author": "",
+  "license": "ISC"
+}
