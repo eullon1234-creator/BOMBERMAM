@@ -112,6 +112,8 @@ class Bomb {
                         // Verifica se este bloco continha a chave secreta
                         if (map.keyInCrate && map.keyInCrate.col === targetCol && map.keyInCrate.row === targetRow) {
                             map.spawnPowerUp(targetCol, targetRow, 'key');
+                        } else if (map.rasenganCrates && map.rasenganCrates.some(c => c.col === targetCol && c.row === targetRow)) {
+                            map.spawnPowerUp(targetCol, targetRow, 'rasengan');
                         } else if (Math.random() < 0.70) {
                             map.spawnPowerUp(targetCol, targetRow);
                         }

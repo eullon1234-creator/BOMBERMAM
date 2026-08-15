@@ -46,6 +46,7 @@ class Map {
         this.powerUps = [];
         this.door = null;
         this.keyInCrate = null;
+        this.rasenganCrates = []; // Guarda as 2 caixas com Rasengan por mapa
 
         const softWallPositions = [];
 
@@ -90,8 +91,8 @@ class Map {
             this.grid.push(rowArray);
         }
 
-        // Posicionamento da Porta e da Chave para as fases 1 e 2
-        if (level < 3 && softWallPositions.length > 3) {
+        // Posicionamento da Porta, Chave e exatamente 2 Rasengans por mapa
+        if (level < 3 && softWallPositions.length > 4) {
             // Embaralha as posições dos blocos de tijolo
             softWallPositions.sort(() => Math.random() - 0.5);
 
@@ -109,8 +110,18 @@ class Map {
                 const keyPos = softWallPositions[1];
                 this.keyInCrate = { col: keyPos.col, row: keyPos.row };
             } else {
-                this.keyInCrate = null; // Será atribuída a um dos inimigos no Game.js
+                this.keyInCrate = null;
             }
+
+            // Exatamente 2 caixas com poder Rasengan escondido
+            this.rasenganCrates = [
+                { col: softWallPositions[2].col, row: softWallPositions[2].row },
+                { col: softWallPositions[3].col, row: softWallPositions[3].row }
+            ];
+        } else if (level === 3) {
+            // No Boss, spawna 2 itens de Rasengan diretamente na arena
+            this.spawnPowerUp(3, 7, 'rasengan');
+            this.spawnPowerUp(11, 7, 'rasengan');
         }
     }
 
@@ -197,6 +208,31 @@ class Map {
                     px + 4, py + 4 + floatOffset,
                     CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8
                 );
+            } else if (p.type === 'rasengan') {
+                const rasenganSprite = spriteLoader ? spriteLoader.get('rasengan') : null;
+                if (rasenganSprite) {
+                    const sw = rasenganSprite.width / 2;
+                    const sh = rasenganSprite.height / 2;
+                    const frame = Math.floor((Date.now() / 90) % 4);
+                    const sx = (frame % 2) * sw;
+                    const sy = Math.floor(frame / 2) * sh;
+
+                    ctx.save();
+                    ctx.shadowColor = '#00e5ff';
+                    ctx.shadowBlur = 14;
+                    ctx.drawImage(
+                        rasenganSprite,
+                        sx, sy, sw, sh,
+                        px + 3, py + 3 + floatOffset,
+                        CONSTANTS.TILE_SIZE - 6, CONSTANTS.TILE_SIZE - 6
+                    );
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = '#00e5ff';
+                    ctx.beginPath();
+                    ctx.arc(px + CONSTANTS.TILE_SIZE/2, py + CONSTANTS.TILE_SIZE/2 + floatOffset, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             } else if (itemSprite) {
                 const iw = itemSprite.width / 2;
                 const ih = itemSprite.height / 2;

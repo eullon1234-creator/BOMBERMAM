@@ -48,6 +48,12 @@
                     <span class="power-text">Velocidade:</span>
                     <strong class="power-val" id="hud-power-speed">Nv.1</strong>
                 </div>
+                <div class="power-stat-pill power-rasengan" id="hud-stat-rasengan" title="Rasengan (Pressione [Z] para disparar)">
+                    <span class="power-icon">🌀</span>
+                    <span class="power-text">Rasengan:</span>
+                    <strong class="power-val" id="hud-power-rasengan">0</strong>
+                    <span class="power-key-tag">[Z]</span>
+                </div>
                 <div class="power-stat-pill power-shield hidden" id="hud-stat-shield" title="Tempo de Escudo Restante">
                     <span class="power-icon">🛡️</span>
                     <span class="power-text">Escudo:</span>
@@ -153,11 +159,15 @@
                         <div class="keys-grid">
                             <div class="key-item">
                                 <div class="key-caps"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div>
-                                <span>Mover o Bomberman</span>
+                                <span>Mover o Personagem</span>
                             </div>
                             <div class="key-item">
                                 <div class="key-caps"><kbd>ESPAÇO</kbd></div>
                                 <span>Plantar Bomba</span>
+                            </div>
+                            <div class="key-item">
+                                <div class="key-caps"><kbd>Z</kbd></div>
+                                <span>Disparar Rasengan (Destrói caixas em linha reta!)</span>
                             </div>
                         </div>
                     </div>
@@ -166,8 +176,8 @@
                         <h3>🎯 Objetivo das Fases</h3>
                         <ul class="guide-list">
                             <li><strong>Fases 1 e 2:</strong> Destrua os tijolos para encontrar a <span class="highlight-gold">🔑 Chave</span> ou derrote os monstros que a carregam. Depois, encontre a <span class="highlight-blue">🚪 Porta Secreta</span> para avançar!</li>
-                            <li><strong>Fase 3:</strong> Enfrente o temível <strong>👑 Mech Boss</strong>! Desvie dos seus ataques e use suas bombas estrategicamente!</li>
-                            <li>Cuidado com as chamas das suas próprias bombas e monstros com habilidades especiais!</li>
+                            <li><strong>Poder Secreto:</strong> Encontre o <span class="highlight-blue">🌀 Rasengan</span> (máx 2 por mapa) e aperte <strong>Z</strong> para furar todas as caixas de uma linha inteira!</li>
+                            <li><strong>Fase 3:</strong> Enfrente o temível <strong>👑 Mech Boss</strong>! Desvie dos seus ataques e use suas bombas e Rasengan estrategicamente!</li>
                         </ul>
                     </div>
                 </div>
@@ -206,6 +216,13 @@
                             <div class="item-info">
                                 <strong>Patins (Speed)</strong>
                                 <p>Aumenta a velocidade de movimento do personagem.</p>
+                            </div>
+                        </div>
+                        <div class="item-card">
+                            <span class="item-icon-symbol">🌀</span>
+                            <div class="item-info">
+                                <strong>Rasengan (Chakra)</strong>
+                                <p>Pressione [Z] para disparar um vórtice que limpa toda a linha de caixas e monstros!</p>
                             </div>
                         </div>
                         <div class="item-card">
@@ -295,6 +312,7 @@
     <script src="js/SpriteLoader.js"></script>
     <script src="js/Entity.js"></script>
     <script src="js/Bomb.js"></script>
+    <script src="js/Rasengan.js"></script>
     <script src="js/Player.js"></script>
     <script src="js/Enemy.js"></script>
     <script src="js/Boss.js"></script>

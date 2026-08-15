@@ -10,6 +10,7 @@ class Game {
         this.enemies = [];
         this.boss = null;
         this.bombs = [];
+        this.rasengans = [];
         
         this.level = 1;
         this.score = 0;
@@ -196,6 +197,16 @@ class Game {
         this.lives = 3;
         this.score = 0;
         this.level = 1;
+
+        // Inicializa os atributos acumulados para a jornada (persistem entre fases)
+        const baseSpeed = (this.selectedCharacter === 'hero_naruto') ? 3.5 : 3.2;
+        this.playerStats = {
+            bombCapacity: 1,
+            bombRadius: 2,
+            speed: baseSpeed,
+            speedLevel: 1,
+            rasenganAmmo: 0
+        };
         
         // Esconde menu inicial e tela de game over
         const menuScreen = document.getElementById('start-menu-screen');
@@ -260,14 +271,26 @@ class Game {
             case 'd': this.player.keys.right = isDown; break;
             case ' ':
             case 'space': this.player.keys.action = isDown; break;
+            case 'z': this.player.keys.special = isDown; break;
         }
     }
 
     initLevel(levelNum) {
         this.map.generate(levelNum);
         this.player = new Player(CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE, this.selectedCharacter);
+        
+        // Aplica os poderes acumulados que continuam para as próximas fases
+        if (this.playerStats) {
+            this.player.bombCapacity = this.playerStats.bombCapacity;
+            this.player.bombRadius = this.playerStats.bombRadius;
+            this.player.speed = this.playerStats.speed;
+            this.player.speedLevel = this.playerStats.speedLevel;
+            this.player.rasenganAmmo = this.playerStats.rasenganAmmo || 0;
+        }
+        
         this.enemies = [];
         this.bombs = [];
+        this.rasengans = [];
         this.boss = null;
         
         if (levelNum === 1) {
@@ -325,7 +348,15 @@ class Game {
         const levelEl = document.getElementById('level-display');
         const livesEl = document.getElementById('lives-display');
         const keyEl = document.getElementById('key-display');
-        const shieldEl = document.getElementById('shield-display');
+        
+        // Contadores da Faixa de Poderes
+        const powerBombsEl = document.getElementById('hud-power-bombs');
+        const powerFireEl = document.getElementById('hud-power-fire');
+        const powerSpeedEl = document.getElementById('hud-power-speed');
+        const powerRasenganEl = document.getElementById('hud-power-rasengan');
+        const statRasenganBox = document.getElementById('hud-stat-rasengan');
+        const statShieldEl = document.getElementById('hud-stat-shield');
+        const powerShieldEl = document.getElementById('hud-power-shield');
         
         if (charEl) {
             charEl.innerText = this.selectedCharacter === 'hero_naruto' ? '🍥 Naruto' : '💣 Bomberman';
@@ -333,6 +364,37 @@ class Game {
         if (scoreEl) scoreEl.innerText = `Score: ${this.score}`;
         if (levelEl) levelEl.innerText = `Fase: ${this.level}${this.level === 3 ? ' (BOSS)' : ''}`;
         if (livesEl) livesEl.innerText = `❤️ ${this.lives}`;
+
+        // Atualiza quantidades dos poderes acumulados
+        const currentBombs = this.player ? this.player.bombCapacity : (this.playerStats?.bombCapacity || 1);
+        const currentFire = this.player ? this.player.bombRadius : (this.playerStats?.bombRadius || 2);
+        const currentSpeedLevel = this.player ? (this.player.speedLevel || 1) : (this.playerStats?.speedLevel || 1);
+        const currentRasengan = this.player ? (this.player.rasenganAmmo || 0) : (this.playerStats?.rasenganAmmo || 0);
+
+        if (powerBombsEl) powerBombsEl.innerText = `${currentBombs}`;
+        if (powerFireEl) powerFireEl.innerText = `${currentFire}`;
+        if (powerSpeedEl) powerSpeedEl.innerText = `Nv.${currentSpeedLevel}`;
+        if (powerRasenganEl) powerRasenganEl.innerText = `${currentRasengan}`;
+
+        if (statRasenganBox) {
+            if (currentRasengan > 0) {
+                statRasenganBox.classList.add('active-ready');
+            } else {
+                statRasenganBox.classList.remove('active-ready');
+            }
+        }
+
+        if (statShieldEl && powerShieldEl && this.player) {
+            if (this.player.hasShield) {
+                statShieldEl.classList.remove('hidden');
+                powerShieldEl.innerText = `${Math.ceil(this.player.shieldTimer / 1000)}s`;
+            } else if (this.player.spawnShieldTimer > 0) {
+                statShieldEl.classList.remove('hidden');
+                powerShieldEl.innerText = "Imune!";
+            } else {
+                statShieldEl.classList.add('hidden');
+            }
+        }
 
         if (keyEl) {
             if (this.level === 3) {
@@ -346,18 +408,6 @@ class Game {
                 keyEl.classList.remove("key-found");
             }
         }
-
-        if (shieldEl && this.player) {
-            if (this.player.hasShield) {
-                shieldEl.classList.remove("hidden");
-                shieldEl.innerText = `🛡️ Escudo (${Math.ceil(this.player.shieldTimer / 1000)}s)`;
-            } else if (this.player.spawnShieldTimer > 0) {
-                shieldEl.classList.remove("hidden");
-                shieldEl.innerText = "🛡️ Imunidade!";
-            } else {
-                shieldEl.classList.add("hidden");
-            }
-        }
     }
 
     checkPowerUpCollection() {
@@ -368,28 +418,41 @@ class Game {
         for (let i = this.map.powerUps.length - 1; i >= 0; i--) {
             const p = this.map.powerUps[i];
             if (p.col === playerGrid.col && p.row === playerGrid.row) {
-                window.soundManager?.playPowerUp();
-                
-                // Aplica efeito do item coletado
-                if (p.type === 'bomb') {
-                    this.player.bombCapacity++;
-                    this.score += 100;
-                } else if (p.type === 'fire') {
-                    this.player.bombRadius++;
-                    this.score += 100;
-                } else if (p.type === 'speed') {
-                    this.player.speed = Math.min(5.2, this.player.speed + 0.45);
-                    this.score += 100;
-                } else if (p.type === 'heart') {
-                    this.lives++;
-                    this.score += 200;
-                } else if (p.type === 'shield') {
-                    this.player.hasShield = true;
-                    this.player.shieldTimer = 10000; // 10s de proteção
-                    this.score += 150;
-                } else if (p.type === 'key') {
-                    this.player.hasKey = true;
-                    this.score += 300;
+                // Aplica efeito do item coletado e salva nos stats acumulados
+                if (p.type === 'rasengan') {
+                    this.player.rasenganAmmo = (this.player.rasenganAmmo || 0) + 1;
+                    if (this.playerStats) this.playerStats.rasenganAmmo = this.player.rasenganAmmo;
+                    this.score += 250;
+                    window.soundManager?.playRasenganCollect();
+                } else {
+                    window.soundManager?.playPowerUp();
+                    if (p.type === 'bomb') {
+                        this.player.bombCapacity++;
+                        if (this.playerStats) this.playerStats.bombCapacity = this.player.bombCapacity;
+                        this.score += 100;
+                    } else if (p.type === 'fire') {
+                        this.player.bombRadius++;
+                        if (this.playerStats) this.playerStats.bombRadius = this.player.bombRadius;
+                        this.score += 100;
+                    } else if (p.type === 'speed') {
+                        this.player.speed = Math.min(5.5, +(this.player.speed + 0.35).toFixed(2));
+                        this.player.speedLevel = (this.player.speedLevel || 1) + 1;
+                        if (this.playerStats) {
+                            this.playerStats.speed = this.player.speed;
+                            this.playerStats.speedLevel = this.player.speedLevel;
+                        }
+                        this.score += 100;
+                    } else if (p.type === 'heart') {
+                        this.lives++;
+                        this.score += 200;
+                    } else if (p.type === 'shield') {
+                        this.player.hasShield = true;
+                        this.player.shieldTimer = 10000; // 10s de proteção
+                        this.score += 150;
+                    } else if (p.type === 'key') {
+                        this.player.hasKey = true;
+                        this.score += 300;
+                    }
                 }
 
                 this.updateUI();
@@ -558,7 +621,15 @@ class Game {
         this.map.update(dt);
 
         if (this.player) {
-            this.player.update(dt, this.map, this.bombs);
+            this.player.update(dt, this.map, this.bombs, this);
+        }
+
+        // Atualiza Projéteis do Rasengan
+        for (let i = this.rasengans.length - 1; i >= 0; i--) {
+            this.rasengans[i].update(dt, this.map, this.enemies, this.boss, this);
+            if (this.rasengans[i].toBeRemoved) {
+                this.rasengans.splice(i, 1);
+            }
         }
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -597,6 +668,11 @@ class Game {
         // Bombas e Explosões
         for (let bomb of this.bombs) {
             bomb.draw(this.ctx, this.spriteLoader);
+        }
+
+        // Projéteis Rasengan em voo
+        for (let rasengan of this.rasengans) {
+            rasengan.draw(this.ctx, this.spriteLoader);
         }
 
         // Inimigos

@@ -25,24 +25,28 @@ class Player extends Entity {
             down: false,
             left: false,
             right: false,
-            action: false
+            action: false,
+            special: false // Tecla Z para Rasengan
         };
         
         this.actionPressed = false;
+        this.specialPressed = false;
         this.direction = 'down'; // 'down', 'up', 'left', 'right'
         this.animFrame = 0;
         this.animTimer = 0;
         this.isMoving = false;
         this.deathTimer = 0;
+        this.castTimer = 0;
 
         // Estado de Itens e Poderes
         this.hasKey = false;
         this.hasShield = false;
         this.shieldTimer = 0;
         this.spawnShieldTimer = 1500; // 1.5s de imunidade inicial ao nascer
+        this.rasenganAmmo = 0;
     }
 
-    handleInput(map, bombsArray) {
+    handleInput(map, bombsArray, game) {
         this.vx = 0;
         this.vy = 0;
 
@@ -74,13 +78,42 @@ class Player extends Entity {
 
         this.isMoving = (this.vx !== 0 || this.vy !== 0);
 
-        // Plantar Bomba
+        // Plantar Bomba (Barra de Espaço)
         if (this.keys.action && !this.actionPressed) {
             this.actionPressed = true;
             this.plantBomb(map, bombsArray);
         } else if (!this.keys.action) {
             this.actionPressed = false;
         }
+
+        // Disparar Rasengan (Tecla Z)
+        if (this.keys.special && !this.specialPressed) {
+            this.specialPressed = true;
+            this.castRasengan(game);
+        } else if (!this.keys.special) {
+            this.specialPressed = false;
+        }
+    }
+
+    castRasengan(game) {
+        if (this.rasenganAmmo <= 0 || !game) return;
+        this.rasenganAmmo--;
+        if (game.playerStats) {
+            game.playerStats.rasenganAmmo = this.rasenganAmmo;
+        }
+        this.castTimer = 260; // Duração do efeito visual de lançamento
+
+        const pSize = CONSTANTS.TILE_SIZE * 0.85;
+        const startX = this.x + (this.width - pSize) / 2;
+        const startY = this.y + (this.height - pSize) / 2;
+
+        const proj = new RasenganProjectile(startX, startY, this.direction, this);
+        game.rasengans.push(proj);
+
+        if (window.soundManager) {
+            window.soundManager.playRasenganLaunch();
+        }
+        game.updateUI();
     }
 
     plantBomb(map, bombsArray) {
@@ -107,10 +140,14 @@ class Player extends Entity {
         }
     }
 
-    update(dt, map, bombsArray) {
+    update(dt, map, bombsArray, game) {
         if (!this.isAlive) {
             this.deathTimer += dt;
             return;
+        }
+
+        if (this.castTimer > 0) {
+            this.castTimer -= dt;
         }
 
         // Atualiza temporizadores de escudo
@@ -124,7 +161,7 @@ class Player extends Entity {
             this.hasShield = false;
         }
 
-        this.handleInput(map, bombsArray);
+        this.handleInput(map, bombsArray, game);
 
         // Atualiza animação de passos
         if (this.isMoving) {
@@ -342,17 +379,19 @@ class Player extends Entity {
             ctx.restore();
         }
 
-        // Ícone flutuante da chave acima da cabeça quando o jogador a possui
-        if (this.isAlive && this.hasKey && doorAndKeySprite) {
-            const kw = doorAndKeySprite.width / 2;
-            const kh = doorAndKeySprite.height / 2;
-            const floatY = Math.sin(Date.now() / 200) * 3;
-            ctx.drawImage(
-                doorAndKeySprite,
-                0 * kw, 1 * kh, kw, kh,
-                this.x + this.width / 2 - 10, this.y - 24 + floatY,
-                20, 20
-            );
+        // Efeito de aura de Chakra durante o disparo do Rasengan
+        if (this.isAlive && this.castTimer > 0) {
+            ctx.save();
+            const cx = this.x + this.width / 2;
+            const cy = this.y + this.height / 2;
+            ctx.shadowColor = '#00e5ff';
+            ctx.shadowBlur = 22;
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(cx, cy, this.width * (0.75 + Math.random() * 0.3), 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
         }
 
         ctx.globalAlpha = 1.0;

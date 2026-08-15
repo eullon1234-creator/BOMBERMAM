@@ -155,6 +155,44 @@ class SoundManager {
         });
     }
 
+    playRasenganCollect() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const freqs = [400, 600, 900, 1200];
+        freqs.forEach((f, i) => {
+            setTimeout(() => {
+                this.playTone(f, 'sine', 0.1, 0.2, 0.005);
+            }, i * 50);
+        });
+    }
+
+    playRasenganLaunch() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.exponentialRampToValueAtTime(1100, now + 0.35);
+
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.35);
+        } catch (e) {}
+    }
+
     playGameOver() {
         if (!this.enabled) return;
         this.init();
