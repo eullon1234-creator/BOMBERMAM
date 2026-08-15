@@ -1,15 +1,24 @@
 class Player extends Entity {
-    constructor(x, y) {
+    constructor(x, y, character = 'hero') {
         // Hitbox ajustada para movimentação fluida nos corredores de 48px
         const boxSize = CONSTANTS.TILE_SIZE * 0.62;
         super(x, y, boxSize, boxSize);
         
-        this.color = CONSTANTS.COLORS.PLAYER;
-        this.speed = 3.2;
+        this.character = character; // 'hero' ou 'hero_naruto'
+        this.color = character === 'hero_naruto' ? '#ff9800' : CONSTANTS.COLORS.PLAYER;
         
-        this.bombCapacity = 1;
+        // Atributos base do personagem escolhido
+        if (this.character === 'hero_naruto') {
+            this.speed = 3.5; // Ninja mais ágil
+            this.bombCapacity = 1;
+            this.bombRadius = 2;
+        } else {
+            this.speed = 3.2; // Clássico equilibrado
+            this.bombCapacity = 1;
+            this.bombRadius = 2;
+        }
+        
         this.bombsActive = 0;
-        this.bombRadius = 2;
         
         this.keys = {
             up: false,
@@ -92,6 +101,10 @@ class Player extends Entity {
         bombsArray.push(newBomb);
         map.grid[gridPos.row][gridPos.col] = CONSTANTS.TILE_BOMB;
         this.bombsActive++;
+
+        if (window.soundManager) {
+            window.soundManager.playBombDrop();
+        }
     }
 
     update(dt, map, bombsArray) {
@@ -226,7 +239,8 @@ class Player extends Entity {
     }
 
     draw(ctx, spriteLoader) {
-        const sprite = spriteLoader ? spriteLoader.get('hero') : null;
+        const spriteName = this.character || 'hero';
+        const sprite = spriteLoader ? spriteLoader.get(spriteName) : null;
         const doorAndKeySprite = spriteLoader ? spriteLoader.get('door_and_key') : null;
         
         // Efeito de piscar durante escudo de nascimento ou invulnerabilidade

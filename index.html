@@ -3,27 +3,295 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bomberman Clone</title>
+    <title>Bomberman Deluxe - Arcade Edition</title>
+    <!-- Google Fonts para tipografia arcade moderna e impactante -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div id="game-container">
-        <div id="ui-layer">
-            <span id="score-display">Score: 0</span>
-            <span id="level-display">Fase: 1</span>
-            <span id="lives-display">Vidas: 3</span>
-            <span id="key-display" class="key-status">🔑 Chave: ❌</span>
-            <span id="shield-display" class="hidden">🛡️ Escudo!</span>
+        <!-- Barra de Status Superior (HUD) -->
+        <div id="ui-layer" class="hidden">
+            <div class="hud-top-row">
+                <div class="hud-left">
+                    <span id="char-display" class="hud-badge char-badge">💣 Hero</span>
+                    <span id="score-display" class="hud-badge score-badge">Score: 0</span>
+                    <span id="level-display" class="hud-badge level-badge">Fase: 1</span>
+                    <span id="lives-display" class="hud-badge lives-badge">❤️ 3</span>
+                </div>
+                <div class="hud-center">
+                    <span id="key-display" class="key-status">🔑 Chave: ❌</span>
+                </div>
+                <div class="hud-right">
+                    <button id="in-game-sound-btn" class="hud-btn" title="Alternar Som">🔊</button>
+                    <button id="in-game-menu-btn" class="hud-btn" title="Voltar ao Menu">🏠 Menu</button>
+                </div>
+            </div>
+
+            <!-- Faixa de Exibição dos Poderes Coletados -->
+            <div class="hud-powers-strip">
+                <span class="powers-label">PODERES:</span>
+                <div class="power-stat-pill" title="Bombas Simultâneas">
+                    <span class="power-icon">💣</span>
+                    <span class="power-text">Bombas:</span>
+                    <strong class="power-val" id="hud-power-bombs">1</strong>
+                </div>
+                <div class="power-stat-pill" title="Alcance da Explosão">
+                    <span class="power-icon">🔥</span>
+                    <span class="power-text">Fogo:</span>
+                    <strong class="power-val" id="hud-power-fire">2</strong>
+                </div>
+                <div class="power-stat-pill" title="Nível de Velocidade">
+                    <span class="power-icon">⚡</span>
+                    <span class="power-text">Velocidade:</span>
+                    <strong class="power-val" id="hud-power-speed">Nv.1</strong>
+                </div>
+                <div class="power-stat-pill power-shield hidden" id="hud-stat-shield" title="Tempo de Escudo Restante">
+                    <span class="power-icon">🛡️</span>
+                    <span class="power-text">Escudo:</span>
+                    <strong class="power-val" id="hud-power-shield">10s</strong>
+                </div>
+            </div>
         </div>
+
+        <!-- Canvas do Jogo -->
         <canvas id="gameCanvas" width="720" height="720"></canvas>
+
+        <!-- MENU INICIAL COMPLETO E ESTILIZADO -->
+        <div id="start-menu-screen" class="menu-overlay">
+            <div class="menu-backdrop"></div>
+            <div class="menu-card">
+                <!-- Banner de Arte do Jogo -->
+                <div class="menu-hero-banner">
+                    <img src="assets/menu_bg.jpg" alt="Bomberman" class="menu-cover-img" id="menu-cover-art">
+                    <div class="menu-banner-gradient"></div>
+                    <div class="title-container">
+                        <span class="arcade-tag">ARCADE DELUXE</span>
+                        <h1 class="game-logo-title">BOMBERMAN</h1>
+                        <p class="game-tagline">EXPLODA OBSTÁCULOS • DERROTE INIMIGOS • VENÇA O BOSS</p>
+                    </div>
+                </div>
+
+                <!-- Painel de Ações do Menu -->
+                <div class="menu-content">
+                    <div class="high-score-banner">
+                        <span class="trophy-icon">🏆</span>
+                        <span class="trophy-text">RECORDE: <strong id="menu-high-score">0</strong> PTS</span>
+                    </div>
+
+                    <!-- Seletor de Personagem -->
+                    <div class="character-select-container">
+                        <span class="select-hero-title">👤 ESCOLHA SEU PERSONAGEM:</span>
+                        <div class="character-cards-grid">
+                            <div class="char-card active" data-char="hero" id="char-card-hero">
+                                <div class="char-avatar-wrapper avatar-bomberman">
+                                    <span class="char-emoji">💣</span>
+                                </div>
+                                <div class="char-card-info">
+                                    <span class="char-name">BOMBERMAN</span>
+                                    <span class="char-tag tag-classic">CLÁSSICO</span>
+                                    <div class="char-stat-mini">⚡ Vel: 3.2 • 🔥 Raio: 2</div>
+                                </div>
+                                <div class="char-selected-check">✓</div>
+                            </div>
+                            
+                            <div class="char-card" data-char="hero_naruto" id="char-card-naruto">
+                                <div class="char-avatar-wrapper avatar-naruto">
+                                    <span class="char-emoji">🍥</span>
+                                </div>
+                                <div class="char-card-info">
+                                    <span class="char-name">NARUTO NINJA</span>
+                                    <span class="char-tag tag-ninja">ÁGIL (+VEL)</span>
+                                    <div class="char-stat-mini">⚡ Vel: 3.5 • 🔥 Raio: 2</div>
+                                </div>
+                                <div class="char-selected-check">✓</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="menu-actions">
+                        <button id="btn-start-game" class="menu-btn btn-primary">
+                            <span class="btn-icon">💣</span>
+                            <span class="btn-text">INICIAR JOGO</span>
+                            <span class="btn-shortcut">[ENTER / ESPAÇO]</span>
+                        </button>
+                        <div class="menu-sub-actions">
+                            <button id="btn-how-to-play" class="menu-btn btn-secondary">
+                                <span class="btn-icon">🕹️</span>
+                                <span class="btn-text">COMO JOGAR</span>
+                            </button>
+                            <button id="btn-guide" class="menu-btn btn-secondary">
+                                <span class="btn-icon">👾</span>
+                                <span class="btn-text">INIMIGOS & ITENS</span>
+                            </button>
+                            <button id="btn-sound-toggle" class="menu-btn btn-tertiary">
+                                <span id="sound-icon" class="btn-icon">🔊</span>
+                                <span id="sound-label" class="btn-text">SOM: LIGADO</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="menu-footer">
+                        <span>Pressione as setas ou WASD para mover • ESPAÇO para plantar bombas</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: COMO JOGAR -->
+        <div id="modal-how-to-play" class="modal-backdrop hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2>🕹️ COMO JOGAR</h2>
+                    <button class="modal-close-btn" data-close="modal-how-to-play">✖</button>
+                </div>
+                <div class="modal-body">
+                    <div class="guide-section">
+                        <h3>🎮 Controles Básicos</h3>
+                        <div class="keys-grid">
+                            <div class="key-item">
+                                <div class="key-caps"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ou <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div>
+                                <span>Mover o Bomberman</span>
+                            </div>
+                            <div class="key-item">
+                                <div class="key-caps"><kbd>ESPAÇO</kbd></div>
+                                <span>Plantar Bomba</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <h3>🎯 Objetivo das Fases</h3>
+                        <ul class="guide-list">
+                            <li><strong>Fases 1 e 2:</strong> Destrua os tijolos para encontrar a <span class="highlight-gold">🔑 Chave</span> ou derrote os monstros que a carregam. Depois, encontre a <span class="highlight-blue">🚪 Porta Secreta</span> para avançar!</li>
+                            <li><strong>Fase 3:</strong> Enfrente o temível <strong>👑 Mech Boss</strong>! Desvie dos seus ataques e use suas bombas estrategicamente!</li>
+                            <li>Cuidado com as chamas das suas próprias bombas e monstros com habilidades especiais!</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="menu-btn btn-primary close-modal-btn" data-close="modal-how-to-play">ENTENDI, VAMOS JOGAR!</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: GUIA DE INIMIGOS E POWER-UPS -->
+        <div id="modal-guide" class="modal-backdrop hidden">
+            <div class="modal-card modal-large">
+                <div class="modal-header">
+                    <h2>👾 GUIA DE MONSTROS & ITENS</h2>
+                    <button class="modal-close-btn" data-close="modal-guide">✖</button>
+                </div>
+                <div class="modal-body">
+                    <h3>💎 Power-Ups</h3>
+                    <div class="items-showcase-grid">
+                        <div class="item-card">
+                            <span class="item-icon-symbol">💣</span>
+                            <div class="item-info">
+                                <strong>Bomba Extra</strong>
+                                <p>Permite colocar +1 bomba simultânea na arena.</p>
+                            </div>
+                        </div>
+                        <div class="item-card">
+                            <span class="item-icon-symbol">🔥</span>
+                            <div class="item-info">
+                                <strong>Fogo / Raio</strong>
+                                <p>Aumenta o alcance da explosão em +1 bloco.</p>
+                            </div>
+                        </div>
+                        <div class="item-card">
+                            <span class="item-icon-symbol">⚡</span>
+                            <div class="item-info">
+                                <strong>Patins (Speed)</strong>
+                                <p>Aumenta a velocidade de movimento do personagem.</p>
+                            </div>
+                        </div>
+                        <div class="item-card">
+                            <span class="item-icon-symbol">❤️</span>
+                            <div class="item-info">
+                                <strong>Vida Extra</strong>
+                                <p>Garante +1 vida para continuar a batalha.</p>
+                            </div>
+                        </div>
+                        <div class="item-card">
+                            <span class="item-icon-symbol">🛡️</span>
+                            <div class="item-info">
+                                <strong>Escudo Mágico</strong>
+                                <p>Proteção temporária total contra explosões e toques.</p>
+                            </div>
+                        </div>
+                        <div class="item-card">
+                            <span class="item-icon-symbol">🔑</span>
+                            <div class="item-info">
+                                <strong>Chave Dourada</strong>
+                                <p>Destranca a porta de saída da fase atual.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 20px;">👹 Bestiário de Inimigos</h3>
+                    <div class="enemies-showcase-grid">
+                        <div class="enemy-card">
+                            <span class="enemy-avatar-badge" style="background:#ff4d4d;">🎈</span>
+                            <div class="enemy-info">
+                                <strong>Ballom (Balão Vermelho)</strong>
+                                <p>Inimigo clássico, patrulha corredores em velocidade moderada.</p>
+                            </div>
+                        </div>
+                        <div class="enemy-card">
+                            <span class="enemy-avatar-badge" style="background:#29b6f6;">💧</span>
+                            <div class="enemy-info">
+                                <strong>Oneal (Slime Azul)</strong>
+                                <p>Muito inteligente! Persegue o jogador e sabe desviar de bombas.</p>
+                            </div>
+                        </div>
+                        <div class="enemy-card">
+                            <span class="enemy-avatar-badge" style="background:#ff9800;">🗿</span>
+                            <div class="enemy-info">
+                                <strong>Dahl (Golem Laranja)</strong>
+                                <p>Tanque com 2 Pontos de Vida e arrancadas velozes perigosas.</p>
+                            </div>
+                        </div>
+                        <div class="enemy-card">
+                            <span class="enemy-avatar-badge" style="background:#ab47bc;">🦇</span>
+                            <div class="enemy-info">
+                                <strong>Minvo (Morcego Roxo)</strong>
+                                <p>Flutua e consegue atravessar blocos de tijolo para te surpreender!</p>
+                            </div>
+                        </div>
+                        <div class="enemy-card boss-card">
+                            <span class="enemy-avatar-badge" style="background:#e53935;">👑</span>
+                            <div class="enemy-info">
+                                <strong>Giga Mech (Grande Chefe)</strong>
+                                <p>Chefe final com múltiplas vidas, investidas colossais e ataques furiosos!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="menu-btn btn-primary close-modal-btn" data-close="modal-guide">FECHAR GUIA</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Game Over / Vitória -->
         <div id="game-over-screen" class="hidden">
-            <h1 id="game-over-title">Game Over</h1>
-            <button id="restart-btn">Restart Game</button>
+            <div class="game-over-box">
+                <h1 id="game-over-title">Game Over</h1>
+                <p id="game-over-subtitle">Pontuação Final: <span id="final-score-val">0</span></p>
+                <div class="game-over-buttons">
+                    <button id="restart-btn" class="menu-btn btn-primary">🔄 Jogar Novamente</button>
+                    <button id="btn-return-menu" class="menu-btn btn-secondary">🏠 Menu Principal</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts do Jogo -->
     <script src="js/constants.js"></script>
+    <script src="js/SoundManager.js"></script>
     <script src="js/SpriteLoader.js"></script>
     <script src="js/Entity.js"></script>
     <script src="js/Bomb.js"></script>

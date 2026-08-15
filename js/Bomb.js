@@ -68,6 +68,10 @@ class Bomb {
         this.exploded = true;
         this.timer = 500;
         
+        if (window.soundManager) {
+            window.soundManager.playExplosion();
+        }
+        
         if (this.owner) {
             this.owner.bombsActive = Math.max(0, this.owner.bombsActive - 1);
         }

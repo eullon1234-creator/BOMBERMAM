@@ -25,6 +25,7 @@ class SpriteLoader {
     async preloadAll() {
         const list = [
             { name: 'hero', src: 'assets/hero.jpg' },
+            { name: 'hero_naruto', src: 'assets/hero_naruto.jpg' },
             { name: 'enemy', src: 'assets/enemy.jpg' },
             { name: 'enemy_blue', src: 'assets/enemy_blue.jpg' },
             { name: 'enemy_orange', src: 'assets/enemy_orange.jpg' },

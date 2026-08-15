@@ -14,11 +14,14 @@ class Game {
         this.level = 1;
         this.score = 0;
         this.lives = 3;
+        this.highScore = parseInt(localStorage.getItem('bm_high_score') || '0', 10);
+        this.selectedCharacter = localStorage.getItem('bm_selected_char') || 'hero';
         
-        this.state = CONSTANTS.STATE_PLAYING;
+        this.state = CONSTANTS.STATE_MENU;
         this.lastTime = 0;
         this.isLoaded = false;
         
+        this.updateHighScoreDisplay();
         this.bindEvents();
         this.init();
     }
@@ -27,28 +30,223 @@ class Game {
         // Carrega e processa todos os spritesheets com Chroma Key
         await this.spriteLoader.preloadAll();
         this.isLoaded = true;
-        this.initLevel(this.level);
+        this.updateSoundButtonUI();
+        this.updateCharacterSelectionUI();
         requestAnimationFrame((t) => this.loop(t));
+    }
+
+    selectCharacter(charKey) {
+        this.selectedCharacter = charKey;
+        localStorage.setItem('bm_selected_char', charKey);
+        this.updateCharacterSelectionUI();
+        window.soundManager?.playSelect();
+    }
+
+    updateCharacterSelectionUI() {
+        document.querySelectorAll('.char-card').forEach(card => {
+            const char = card.getAttribute('data-char');
+            if (char === this.selectedCharacter) {
+                card.classList.add('active');
+            } else {
+                card.classList.remove('active');
+            }
+        });
+    }
+
+    updateHighScoreDisplay() {
+        const hsMenu = document.getElementById('menu-high-score');
+        if (hsMenu) hsMenu.innerText = this.highScore;
+    }
+
+    saveHighScore() {
+        if (this.score > this.highScore) {
+            this.highScore = this.score;
+            localStorage.setItem('bm_high_score', this.highScore.toString());
+            this.updateHighScoreDisplay();
+        }
     }
 
     bindEvents() {
         window.addEventListener('keydown', (e) => this.handleKey(e, true));
         window.addEventListener('keyup', (e) => this.handleKey(e, false));
         
+        // Botão Iniciar Jogo no Menu
+        const startBtn = document.getElementById('btn-start-game');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => this.startGame());
+            startBtn.addEventListener('mouseenter', () => window.soundManager?.playHover());
+        }
+
+        // Botões de Como Jogar & Guia (Modais)
+        const howToBtn = document.getElementById('btn-how-to-play');
+        if (howToBtn) {
+            howToBtn.addEventListener('click', () => {
+                window.soundManager?.playSelect();
+                this.openModal('modal-how-to-play');
+            });
+            howToBtn.addEventListener('mouseenter', () => window.soundManager?.playHover());
+        }
+
+        const guideBtn = document.getElementById('btn-guide');
+        if (guideBtn) {
+            guideBtn.addEventListener('click', () => {
+                window.soundManager?.playSelect();
+                this.openModal('modal-guide');
+            });
+            guideBtn.addEventListener('mouseenter', () => window.soundManager?.playHover());
+        }
+
+        // Botões para fechar Modais
+        document.querySelectorAll('.modal-close-btn, .close-modal-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetId = e.currentTarget.getAttribute('data-close');
+                if (targetId) {
+                    window.soundManager?.playHover();
+                    this.closeModal(targetId);
+                }
+            });
+        });
+
+        // Fechar modal ao clicar no fundo
+        document.querySelectorAll('.modal-backdrop').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
+
+        // Alternar Som (Menu e In-Game)
+        const menuSoundBtn = document.getElementById('btn-sound-toggle');
+        if (menuSoundBtn) {
+            menuSoundBtn.addEventListener('click', () => this.toggleSound());
+        }
+
+        const inGameSoundBtn = document.getElementById('in-game-sound-btn');
+        if (inGameSoundBtn) {
+            inGameSoundBtn.addEventListener('click', () => this.toggleSound());
+        }
+
+        // Seletor de Personagem (Bomberman / Naruto)
+        document.querySelectorAll('.char-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const char = card.getAttribute('data-char');
+                if (char) {
+                    this.selectCharacter(char);
+                }
+            });
+            card.addEventListener('mouseenter', () => window.soundManager?.playHover());
+        });
+
+        // Botão de Retornar ao Menu (HUD e Game Over)
+        const inGameMenuBtn = document.getElementById('in-game-menu-btn');
+        if (inGameMenuBtn) {
+            inGameMenuBtn.addEventListener('click', () => this.returnToMenu());
+        }
+
+        const returnMenuBtn = document.getElementById('btn-return-menu');
+        if (returnMenuBtn) {
+            returnMenuBtn.addEventListener('click', () => this.returnToMenu());
+        }
+
+        // Botão de Reiniciar após Game Over / Vitória
         const restartBtn = document.getElementById('restart-btn');
         if (restartBtn) {
             restartBtn.addEventListener('click', () => {
-                this.lives = 3;
-                this.score = 0;
-                this.level = 1;
+                window.soundManager?.playSelect();
                 document.getElementById('game-over-screen').classList.add('hidden');
-                this.initLevel(this.level);
-                this.state = CONSTANTS.STATE_PLAYING;
+                this.startGame();
             });
+            restartBtn.addEventListener('mouseenter', () => window.soundManager?.playHover());
         }
     }
 
+    openModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    closeModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) modal.classList.add('hidden');
+    }
+
+    toggleSound() {
+        if (window.soundManager) {
+            const isEnabled = window.soundManager.toggle();
+            this.updateSoundButtonUI();
+        }
+    }
+
+    updateSoundButtonUI() {
+        const isEnabled = window.soundManager ? window.soundManager.enabled : true;
+        
+        const soundIcon = document.getElementById('sound-icon');
+        const soundLabel = document.getElementById('sound-label');
+        const inGameSoundBtn = document.getElementById('in-game-sound-btn');
+
+        if (soundIcon) soundIcon.innerText = isEnabled ? '🔊' : '🔇';
+        if (soundLabel) soundLabel.innerText = isEnabled ? 'SOM: LIGADO' : 'SOM: MUDO';
+        if (inGameSoundBtn) inGameSoundBtn.innerText = isEnabled ? '🔊' : '🔇';
+    }
+
+    startGame() {
+        window.soundManager?.playGameStart();
+        
+        this.lives = 3;
+        this.score = 0;
+        this.level = 1;
+        
+        // Esconde menu inicial e tela de game over
+        const menuScreen = document.getElementById('start-menu-screen');
+        if (menuScreen) menuScreen.classList.add('hidden');
+        
+        const gameOverScreen = document.getElementById('game-over-screen');
+        if (gameOverScreen) gameOverScreen.classList.add('hidden');
+        
+        const uiLayer = document.getElementById('ui-layer');
+        if (uiLayer) uiLayer.classList.remove('hidden');
+        
+        this.initLevel(this.level);
+        this.state = CONSTANTS.STATE_PLAYING;
+    }
+
+    returnToMenu() {
+        window.soundManager?.playSelect();
+        this.saveHighScore();
+        
+        this.state = CONSTANTS.STATE_MENU;
+        
+        const menuScreen = document.getElementById('start-menu-screen');
+        if (menuScreen) menuScreen.classList.remove('hidden');
+        
+        const gameOverScreen = document.getElementById('game-over-screen');
+        if (gameOverScreen) gameOverScreen.classList.add('hidden');
+        
+        const uiLayer = document.getElementById('ui-layer');
+        if (uiLayer) uiLayer.classList.add('hidden');
+    }
+
     handleKey(e, isDown) {
+        // Se estiver no menu e pressionar Enter ou Espaço, inicia o jogo
+        if (this.state === CONSTANTS.STATE_MENU && isDown) {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                const anyModalOpen = !document.getElementById('modal-how-to-play')?.classList.contains('hidden') ||
+                                     !document.getElementById('modal-guide')?.classList.contains('hidden');
+                if (!anyModalOpen) {
+                    this.startGame();
+                    return;
+                }
+            }
+        }
+
+        // Tecla ESC para fechar modais abertos
+        if (e.key === 'Escape' && isDown) {
+            this.closeModal('modal-how-to-play');
+            this.closeModal('modal-guide');
+            return;
+        }
+
         if (!this.player) return;
         
         switch(e.key.toLowerCase()) {
@@ -67,7 +265,7 @@ class Game {
 
     initLevel(levelNum) {
         this.map.generate(levelNum);
-        this.player = new Player(CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE);
+        this.player = new Player(CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE, this.selectedCharacter);
         this.enemies = [];
         this.bombs = [];
         this.boss = null;
@@ -122,15 +320,19 @@ class Game {
     }
 
     updateUI() {
+        const charEl = document.getElementById('char-display');
         const scoreEl = document.getElementById('score-display');
         const levelEl = document.getElementById('level-display');
         const livesEl = document.getElementById('lives-display');
         const keyEl = document.getElementById('key-display');
         const shieldEl = document.getElementById('shield-display');
         
+        if (charEl) {
+            charEl.innerText = this.selectedCharacter === 'hero_naruto' ? '🍥 Naruto' : '💣 Bomberman';
+        }
         if (scoreEl) scoreEl.innerText = `Score: ${this.score}`;
         if (levelEl) levelEl.innerText = `Fase: ${this.level}${this.level === 3 ? ' (BOSS)' : ''}`;
-        if (livesEl) livesEl.innerText = `Vidas: ${this.lives}`;
+        if (livesEl) livesEl.innerText = `❤️ ${this.lives}`;
 
         if (keyEl) {
             if (this.level === 3) {
@@ -166,6 +368,8 @@ class Game {
         for (let i = this.map.powerUps.length - 1; i >= 0; i--) {
             const p = this.map.powerUps[i];
             if (p.col === playerGrid.col && p.row === playerGrid.row) {
+                window.soundManager?.playPowerUp();
+                
                 // Aplica efeito do item coletado
                 if (p.type === 'bomb') {
                     this.player.bombCapacity++;
@@ -276,18 +480,26 @@ class Game {
         this.updateUI();
         
         if (this.lives <= 0) {
+            this.saveHighScore();
+            window.soundManager?.playGameOver();
+            
             setTimeout(() => {
                 this.state = CONSTANTS.STATE_GAME_OVER;
                 const titleEl = document.getElementById('game-over-title');
+                const scoreValEl = document.getElementById('final-score-val');
+                
                 if (titleEl) {
-                    titleEl.innerText = "Game Over";
+                    titleEl.innerText = "GAME OVER";
                     titleEl.style.color = "#ff3333";
+                }
+                if (scoreValEl) {
+                    scoreValVal: scoreValEl.innerText = this.score;
                 }
                 document.getElementById('game-over-screen').classList.remove('hidden');
             }, 700);
         } else {
             setTimeout(() => {
-                if (this.state !== CONSTANTS.STATE_GAME_OVER) {
+                if (this.state !== CONSTANTS.STATE_GAME_OVER && this.state !== CONSTANTS.STATE_MENU) {
                     this.initLevel(this.level);
                 }
             }, 1000);
@@ -301,6 +513,7 @@ class Game {
                 const playerGrid = this.player.getGridPos();
                 if (playerGrid.col === this.map.door.col && playerGrid.row === this.map.door.row) {
                     if (this.player.hasKey) {
+                        window.soundManager?.playVictory();
                         this.score += 500;
                         this.level++;
                         this.initLevel(this.level);
@@ -309,11 +522,19 @@ class Game {
             }
         } else if (this.level === 3) {
             if (this.boss && !this.boss.isAlive && this.boss.deathTimer > 1500) {
+                this.saveHighScore();
+                window.soundManager?.playVictory();
                 this.state = CONSTANTS.STATE_VICTORY;
+                
                 const titleEl = document.getElementById('game-over-title');
+                const scoreValEl = document.getElementById('final-score-val');
+                
                 if (titleEl) {
-                    titleEl.innerText = "VITÓRIA!";
+                    titleEl.innerText = "👑 VITÓRIA!";
                     titleEl.style.color = "#4CAF50";
+                }
+                if (scoreValEl) {
+                    scoreValEl.innerText = this.score;
                 }
                 document.getElementById('game-over-screen').classList.remove('hidden');
             }
@@ -327,9 +548,8 @@ class Game {
 
         if (this.state === CONSTANTS.STATE_PLAYING && this.isLoaded) {
             this.update(dt);
+            this.draw();
         }
-        
-        this.draw();
         
         requestAnimationFrame((t) => this.loop(t));
     }
