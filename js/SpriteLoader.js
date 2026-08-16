@@ -29,7 +29,7 @@ class SpriteLoader {
             { name: 'hero', src: 'assets/hero.jpg' },
             { name: 'hero_naruto', src: 'assets/hero_naruto.jpg' },
             { name: 'hero_sasuke', src: 'assets/hero_sasuke.jpg' },
-            { name: 'hero_warrior', src: 'assets/hero_warrior.png', whiteKey: true },
+            { name: 'hero_warrior', src: 'assets/char_a_p1_0bas_humn_v00.png', whiteKey: true },
             { name: 'enemy', src: 'assets/enemy.jpg' },
             { name: 'enemy_blue', src: 'assets/enemy_blue.jpg' },
             { name: 'enemy_orange', src: 'assets/enemy_orange.jpg' },
