@@ -200,7 +200,10 @@ class Game {
         this.level = 1;
 
         // Inicializa os atributos acumulados para a jornada (persistem entre fases)
-        const baseSpeed = (this.selectedCharacter === 'hero_sasuke') ? 2.9 : (this.selectedCharacter === 'hero_naruto') ? 2.8 : 2.6;
+        const baseSpeed = (this.selectedCharacter === 'hero_sasuke') ? 2.9 
+                        : (this.selectedCharacter === 'hero_naruto') ? 2.8 
+                        : (this.selectedCharacter === 'hero_warrior') ? 3.0
+                        : 2.6;
         this.playerStats = {
             bombCapacity: 1,
             bombRadius: 2,
@@ -365,6 +368,8 @@ class Game {
                 charEl.innerText = '⚡ Sasuke';
             } else if (this.selectedCharacter === 'hero_naruto') {
                 charEl.innerText = '🍥 Naruto';
+            } else if (this.selectedCharacter === 'hero_warrior') {
+                charEl.innerText = '⚔️ Guerreiro';
             } else {
                 charEl.innerText = '💣 Bomberman';
             }

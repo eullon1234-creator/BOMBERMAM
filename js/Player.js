@@ -4,7 +4,7 @@ class Player extends Entity {
         const boxSize = CONSTANTS.TILE_SIZE * 0.62;
         super(x, y, boxSize, boxSize);
         
-        this.character = character; // 'hero', 'hero_naruto' ou 'hero_sasuke'
+        this.character = character; // 'hero', 'hero_naruto', 'hero_sasuke' ou 'hero_warrior'
         
         if (this.character === 'hero_naruto') {
             this.color = '#ff9800';
@@ -16,6 +16,11 @@ class Player extends Entity {
             this.speed = 2.3; // Shinobi veloz
             this.bombCapacity = 1;
             this.bombRadius = 2;
+        } else if (this.character === 'hero_warrior') {
+            this.color = '#c8860a';
+            this.speed = 2.4; // Guerreiro veloz e resistente
+            this.bombCapacity = 1;
+            this.bombRadius = 3; // Raio de fogo maior desde o início!
         } else {
             this.color = CONSTANTS.COLORS.PLAYER;
             this.speed = 2.0; // Clássico equilibrado e preciso
@@ -187,8 +192,10 @@ class Player extends Entity {
         // Atualiza animação de passos
         if (this.isMoving) {
             this.animTimer += dt;
-            if (this.animTimer > 110) {
-                this.animFrame = (this.animFrame + 1) % 4;
+            const frameDelay = (this.character === 'hero_warrior') ? 80 : 110;
+            const maxFrames  = (this.character === 'hero_warrior') ? 8  : 4;
+            if (this.animTimer > frameDelay) {
+                this.animFrame = (this.animFrame + 1) % maxFrames;
                 this.animTimer = 0;
             }
         } else {
@@ -313,7 +320,85 @@ class Player extends Entity {
             ctx.globalAlpha = 0.6;
         }
 
-        if (sprite) {
+        if (sprite && this.character === 'hero_warrior') {
+            // Sprite sheet do Guerreiro: 8 colunas × 8 linhas
+            // Linha 0: caminhar para baixo (para frente)
+            // Linha 1: caminhar para cima
+            // Linha 2: caminhar para esquerda
+            // Linha 3: caminhar para direita
+            // Linha 4-5: idle / idle alternativo
+            // Linha 7: morte
+            const COLS = 8;
+            const ROWS = 8;
+            const frameW = sprite.width / COLS;
+            const frameH = sprite.height / ROWS;
+            let row = 0;
+            let flipH = false;
+            let colFrame = this.isMoving ? (this.animFrame % COLS) : 0;
+
+            if (!this.isAlive) {
+                // Animação de morte: linha 7, progride da esq para dir
+                row = 7;
+                colFrame = Math.min(COLS - 1, Math.floor(this.deathTimer / 100));
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, 1 - this.deathTimer / 800);
+                ctx.drawImage(
+                    sprite,
+                    colFrame * frameW, row * frameH, frameW, frameH,
+                    this.x - (CONSTANTS.TILE_SIZE - this.width) / 2,
+                    this.y - (CONSTANTS.TILE_SIZE - this.height) / 2 - 8,
+                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8
+                );
+                ctx.restore();
+                ctx.globalAlpha = 1.0;
+                return;
+            }
+
+            // Seleciona linha por direção
+            if (this.direction === 'down')       { row = 0; flipH = false; }
+            else if (this.direction === 'up')    { row = 1; flipH = false; }
+            else if (this.direction === 'left')  { row = 2; flipH = false; }
+            else if (this.direction === 'right') { row = 2; flipH = true;  }
+
+            // Idle: usa linha de baixo, frame 0 estático
+            if (!this.isMoving) {
+                colFrame = 0;
+                // Pequena respiração: alterna entre frame 0 e 1 lentamente
+                const idlePulse = Math.floor(Date.now() / 500) % 2;
+                colFrame = idlePulse;
+            }
+
+            const drawX = this.x - (CONSTANTS.TILE_SIZE - this.width) / 2;
+            const drawY = this.y - (CONSTANTS.TILE_SIZE - this.height) / 2 - 8;
+
+            ctx.save();
+
+            // Aura dourada pulsante enquanto ativo (sempre no guerreiro!)
+            const auraPulse = 0.85 + Math.sin(Date.now() / 300) * 0.15;
+            ctx.shadowColor = 'rgba(255, 200, 50, 0.5)';
+            ctx.shadowBlur = 8 * auraPulse;
+
+            if (flipH) {
+                ctx.translate(drawX + CONSTANTS.TILE_SIZE, drawY);
+                ctx.scale(-1, 1);
+                ctx.drawImage(
+                    sprite,
+                    colFrame * frameW, row * frameH, frameW, frameH,
+                    0, 0,
+                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8
+                );
+            } else {
+                ctx.drawImage(
+                    sprite,
+                    colFrame * frameW, row * frameH, frameW, frameH,
+                    drawX, drawY,
+                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8
+                );
+            }
+            ctx.restore();
+
+        } else if (sprite) {
+            // Sprites de 4 colunas × 4 linhas (hero, naruto, sasuke)
             const frameW = sprite.width / 4;
             const frameH = sprite.height / 4;
             let row = 0;
@@ -431,6 +516,28 @@ class Player extends Entity {
                     const ang = Math.random() * Math.PI * 2;
                     const r = this.width * (0.6 + Math.random() * 0.4);
                     ctx.fillRect(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, 3, 3);
+                }
+            } else if (this.character === 'hero_warrior') {
+                // Explosão de energia dourada do Guerreiro
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 30;
+                ctx.strokeStyle = 'rgba(255, 200, 20, 0.95)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(cx, cy, this.width * (0.9 + Math.random() * 0.4), 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Faíscas douradas radiando para fora
+                for (let i = 0; i < 6; i++) {
+                    const ang = (i / 6) * Math.PI * 2 + Date.now() * 0.01;
+                    const r1 = this.width * 0.9;
+                    const r2 = this.width * (1.2 + Math.random() * 0.5);
+                    ctx.strokeStyle = `rgba(255, ${180 + Math.random() * 70 | 0}, 0, 0.8)`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+                    ctx.lineTo(cx + Math.cos(ang) * r2, cy + Math.sin(ang) * r2);
+                    ctx.stroke();
                 }
             } else {
                 // Vórtice espiral do Rasengan

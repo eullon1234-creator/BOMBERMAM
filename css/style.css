@@ -511,6 +511,25 @@ canvas {
     border: 1px solid rgba(0, 229, 255, 0.4);
 }
 
+.avatar-warrior {
+    background: radial-gradient(circle, rgba(200, 134, 10, 0.35) 0%, rgba(255, 200, 50, 0.1) 100%);
+    border: 1px solid rgba(255, 180, 30, 0.6);
+    box-shadow: 0 0 10px rgba(255, 200, 50, 0.3), inset 0 0 8px rgba(255, 160, 0, 0.15);
+    animation: warrior-glow 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes warrior-glow {
+    from { box-shadow: 0 0 6px rgba(255, 200, 50, 0.25), inset 0 0 5px rgba(255, 160, 0, 0.1); }
+    to   { box-shadow: 0 0 16px rgba(255, 200, 50, 0.55), inset 0 0 10px rgba(255, 160, 0, 0.25); }
+}
+
+.tag-warrior {
+    background: linear-gradient(90deg, rgba(200, 134, 10, 0.35), rgba(255, 210, 60, 0.25));
+    color: #ffd54f;
+    border: 1px solid rgba(255, 200, 50, 0.5);
+    text-shadow: 0 0 4px rgba(255, 200, 0, 0.6);
+}
+
 .char-stat-mini {
     font-size: 8.5px;
     color: var(--text-muted);

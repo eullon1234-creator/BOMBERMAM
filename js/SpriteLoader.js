@@ -4,13 +4,15 @@ class SpriteLoader {
         this.sprites = {}; // Imagens com Chroma Key aplicado e prontas
     }
 
-    loadImage(name, src) {
+    loadImage(name, src, useWhiteKey = false) {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = "Anonymous";
             img.onload = () => {
                 this.rawImages[name] = img;
-                const processed = this.applyChromaKey(img);
+                const processed = useWhiteKey
+                    ? this.applyWhiteChromaKey(img)
+                    : this.applyChromaKey(img);
                 this.sprites[name] = processed;
                 resolve(processed);
             };
@@ -27,6 +29,7 @@ class SpriteLoader {
             { name: 'hero', src: 'assets/hero.jpg' },
             { name: 'hero_naruto', src: 'assets/hero_naruto.jpg' },
             { name: 'hero_sasuke', src: 'assets/hero_sasuke.jpg' },
+            { name: 'hero_warrior', src: 'assets/hero_warrior.png', whiteKey: true },
             { name: 'enemy', src: 'assets/enemy.jpg' },
             { name: 'enemy_blue', src: 'assets/enemy_blue.jpg' },
             { name: 'enemy_orange', src: 'assets/enemy_orange.jpg' },
@@ -40,7 +43,7 @@ class SpriteLoader {
         ];
 
         for (let item of list) {
-            await this.loadImage(item.name, item.src);
+            await this.loadImage(item.name, item.src, item.whiteKey || false);
         }
         return this.sprites;
     }
@@ -67,6 +70,40 @@ class SpriteLoader {
             
             if (isGreen) {
                 data[i + 3] = 0; // Transparente
+            }
+        }
+        
+        ctx.putImageData(imgData, 0, 0);
+        return canvas;
+    }
+
+    // Remove fundo branco/quase-branco de sprites PNG com fundo claro
+    applyWhiteChromaKey(img) {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(img, 0, 0);
+        
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // Remove pixels brancos e tons muito claros (fundo do sprite sheet)
+            const brightness = (r + g + b) / 3;
+            const isWhiteish = brightness > 220 && r > 200 && g > 200 && b > 200;
+            
+            if (isWhiteish) {
+                data[i + 3] = 0; // Transparente
+            } else if (brightness > 180 && r > 170 && g > 170 && b > 170) {
+                // Semitransparente para bordas suaves (anti-aliasing)
+                const factor = (brightness - 180) / 40;
+                data[i + 3] = Math.round((1 - factor) * 255);
             }
         }
         
