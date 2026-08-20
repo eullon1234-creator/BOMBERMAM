@@ -2,7 +2,6 @@ class Enemy extends Entity {
     constructor(x, y, type = CONSTANTS.ENEMY_TYPES.BALLOM) {
         super(x, y, CONSTANTS.TILE_SIZE * 0.75, CONSTANTS.TILE_SIZE * 0.75);
 
-        // Define o tipo e características
         this.type = type;
         this.setupTypeAttributes();
 
@@ -10,9 +9,8 @@ class Enemy extends Entity {
         this.y = y + (CONSTANTS.TILE_SIZE - this.height) / 2;
 
         this.direction = this.getRandomDirection();
-        this.facing = 'down'; // 'down', 'up', 'left', 'right'
+        this.facing = 'down';
 
-        // Timers e Estados
         this.animFrame = 0;
         this.animTimer = 0;
         this.deathTimer = 0;
@@ -21,48 +19,50 @@ class Enemy extends Entity {
         this.chargeTimer = 0;
         this.isCharging = false;
         this.toBeRemoved = false;
-        this.hasKey = false; // Se for o portador da chave
+        this.hasKey = false;
 
-        // Suporte a compatibilidade de level antigo (para cálculo de score)
+        // Estado de Congelamento (Bomba de Gelo)
+        this.freezeTimer = 0;
+
         this.level = this.type === CONSTANTS.ENEMY_TYPES.BALLOM ? 1 : 2;
     }
 
     setupTypeAttributes() {
         switch (this.type) {
-            case CONSTANTS.ENEMY_TYPES.ONEAL: // Slime Azul: Rápido, BFS e esquiva
+            case CONSTANTS.ENEMY_TYPES.ONEAL:
                 this.spriteKey = 'enemy_blue';
                 this.color = '#2196f3';
-                this.baseSpeed = 1.0;
-                this.speed = 1.0;
+                this.baseSpeed = 1.05;
+                this.speed = 1.05;
                 this.hp = 1;
                 this.maxHp = 1;
                 this.scoreValue = 200;
                 this.canPassSoftWalls = false;
                 break;
 
-            case CONSTANTS.ENEMY_TYPES.DAHL: // Golem Laranja: Tanque com 2 HP e investida
+            case CONSTANTS.ENEMY_TYPES.DAHL:
                 this.spriteKey = 'enemy_orange';
                 this.color = '#ff9800';
-                this.baseSpeed = 0.75;
-                this.speed = 0.75;
+                this.baseSpeed = 0.8;
+                this.speed = 0.8;
                 this.hp = 2;
                 this.maxHp = 2;
                 this.scoreValue = 350;
                 this.canPassSoftWalls = false;
                 break;
 
-            case CONSTANTS.ENEMY_TYPES.MINVO: // Morcego Roxo: Flutua através de tijolos
+            case CONSTANTS.ENEMY_TYPES.MINVO:
                 this.spriteKey = 'enemy_purple';
                 this.color = '#ab47bc';
-                this.baseSpeed = 0.85;
-                this.speed = 0.85;
+                this.baseSpeed = 0.9;
+                this.speed = 0.9;
                 this.hp = 1;
                 this.maxHp = 1;
                 this.scoreValue = 300;
                 this.canPassSoftWalls = true;
                 break;
 
-            case CONSTANTS.ENEMY_TYPES.BALLOM: // Balão Vermelho: Clássico, patrulha
+            case CONSTANTS.ENEMY_TYPES.BALLOM:
             default:
                 this.type = CONSTANTS.ENEMY_TYPES.BALLOM;
                 this.spriteKey = 'enemy';
@@ -87,27 +87,33 @@ class Enemy extends Entity {
         return dirs[Math.floor(Math.random() * dirs.length)];
     }
 
+    freeze(duration = 4000) {
+        this.freezeTimer = duration;
+        if (window.soundManager) {
+            window.soundManager.playFreeze();
+        }
+    }
+
     takeDamage(amount = 1, map = null) {
         if (!this.isAlive || this.damageTimer > 0) return false;
 
         this.hp -= amount;
-        this.damageTimer = 400; // Invulnerabilidade breve / piscar
+        this.damageTimer = 400;
 
         if (this.hp <= 0) {
             this.hp = 0;
             this.isAlive = false;
             this.deathTimer = 0;
 
-            // Se for o portador da chave, solta a chave no chão!
             if (this.hasKey && map && map.spawnPowerUp) {
                 const grid = this.getGridPos();
                 map.spawnPowerUp(grid.col, grid.row, 'key');
                 this.hasKey = false;
             }
 
-            return true; // Morreu
+            return true;
         }
-        return false; // Sobreviveu com dano
+        return false;
     }
 
     update(dt, map, player, bombs = []) {
@@ -123,7 +129,12 @@ class Enemy extends Entity {
             this.damageTimer -= dt;
         }
 
-        // Animação de caminhada/ação
+        // Se estiver congelado, não se move nem toma decisões
+        if (this.freezeTimer > 0) {
+            this.freezeTimer -= dt;
+            return;
+        }
+
         this.animTimer += dt;
         const animSpeed = this.isCharging ? 90 : 140;
         if (this.animTimer > animSpeed) {
@@ -131,14 +142,12 @@ class Enemy extends Entity {
             this.animTimer = 0;
         }
 
-        // Timer de tomada de decisão da IA (para evitar mudanças bruscas a cada frame)
         this.decisionTimer -= dt;
         if (this.decisionTimer <= 0) {
             this.decisionTimer = 160 + Math.random() * 80;
             this.decideNextMove(map, player, bombs);
         }
 
-        // Execução do movimento de acordo com o tipo
         this.executeMovement(dt, map);
     }
 
@@ -150,12 +159,10 @@ class Enemy extends Entity {
         const currentCol = Math.floor(myCenter.x / CONSTANTS.TILE_SIZE);
         const currentRow = Math.floor(myCenter.y / CONSTANTS.TILE_SIZE);
 
-        // 1. AVALIAÇÃO DE PERIGO DE BOMBA (Esquiva Inteligente)
         const dangerMap = this.calculateBombDangerZones(map, bombs);
         const isInDanger = dangerMap[`${currentCol},${currentRow}`];
 
         if (isInDanger) {
-            // Tenta achar a melhor rota de fuga para um tile seguro
             const escapeDir = this.findEscapeDirection(currentCol, currentRow, map, dangerMap);
             if (escapeDir) {
                 this.direction = escapeDir;
@@ -165,20 +172,16 @@ class Enemy extends Entity {
             }
         }
 
-        // 2. COMPORTAMENTO ESPECÍFICO POR TIPO
         switch (this.type) {
-            case CONSTANTS.ENEMY_TYPES.ONEAL: // Busca caminho mais curto até o jogador (BFS)
+            case CONSTANTS.ENEMY_TYPES.ONEAL:
                 this.decideOnealMove(currentCol, currentRow, map, player, dangerMap);
                 break;
-
-            case CONSTANTS.ENEMY_TYPES.DAHL: // Investida em linha de visão
+            case CONSTANTS.ENEMY_TYPES.DAHL:
                 this.decideDahlMove(currentCol, currentRow, map, player, dangerMap);
                 break;
-
-            case CONSTANTS.ENEMY_TYPES.MINVO: // Perseguição com passagem por blocos destrutíveis
+            case CONSTANTS.ENEMY_TYPES.MINVO:
                 this.decideMinvoMove(currentCol, currentRow, map, player, dangerMap);
                 break;
-
             case CONSTANTS.ENEMY_TYPES.BALLOM:
             default:
                 this.decideBallomMove(currentCol, currentRow, map, player, dangerMap);
@@ -190,11 +193,8 @@ class Enemy extends Entity {
         const danger = {};
         for (let bomb of bombs) {
             if (bomb.toBeRemoved) continue;
-            
-            // Tile da própria bomba
             danger[`${bomb.col},${bomb.row}`] = true;
 
-            // Linhas de expansão da bomba
             const dirs = [
                 { c: 0, r: -1 }, { c: 0, r: 1 },
                 { c: -1, r: 0 }, { c: 1, r: 0 }
@@ -210,7 +210,7 @@ class Enemy extends Entity {
                     if (tile === CONSTANTS.TILE_SOLID) break;
                     
                     danger[`${tc},${tr}`] = true;
-                    if (tile === CONSTANTS.TILE_SOFT) break; // Tijolo bloqueia alcance
+                    if (tile === CONSTANTS.TILE_SOFT) break;
                 }
             }
         }
@@ -225,7 +225,6 @@ class Enemy extends Entity {
             { vx: 1, vy: 0, name: 'right', c: 1, r: 0 }
         ];
 
-        // Embaralha para não ser previsível
         dirs.sort(() => Math.random() - 0.5);
 
         for (let d of dirs) {
@@ -233,7 +232,6 @@ class Enemy extends Entity {
             const nextRow = row + d.r;
 
             if (this.isTilePassable(nextCol, nextRow, map)) {
-                // Se o próximo tile não estiver em perigo, foge para lá!
                 if (!dangerMap[`${nextCol},${nextRow}`]) {
                     return { vx: d.vx, vy: d.vy, name: d.name };
                 }
@@ -251,20 +249,16 @@ class Enemy extends Entity {
         return true;
     }
 
-    // --- LÓGICAS INDIVIDUAIS DE IA ---
-
     decideBallomMove(col, row, map, player, dangerMap) {
         this.speed = this.baseSpeed;
         const availableDirs = this.getAvailableDirections(col, row, map, dangerMap);
         if (availableDirs.length === 0) return;
 
-        // Se estiver se movendo e o caminho continuar livre, mantém na maioria das vezes
         const currentIsAvailable = availableDirs.find(d => d.name === this.facing);
         if (currentIsAvailable && Math.random() < 0.7) {
             return;
         }
 
-        // Escolhe uma direção válida disponível
         const chosen = availableDirs[Math.floor(Math.random() * availableDirs.length)];
         this.direction = { vx: chosen.vx, vy: chosen.vy };
         this.facing = chosen.name;
@@ -272,12 +266,13 @@ class Enemy extends Entity {
 
     decideOnealMove(col, row, map, player, dangerMap) {
         this.speed = this.baseSpeed;
+        if (!player || !player.isAlive) {
+            this.decideBallomMove(col, row, map, player, dangerMap);
+            return;
+        }
         const playerGrid = player.getGridPos();
-
-        // Distância de Manhattan até o jogador
         const dist = Math.abs(col - playerGrid.col) + Math.abs(row - playerGrid.row);
 
-        // Se o jogador estiver em um raio de até 8 blocos, usa BFS para traçar o melhor caminho
         if (dist <= 8) {
             const path = this.findPathBFS(col, row, playerGrid.col, playerGrid.row, map, dangerMap);
             if (path && path.length > 0) {
@@ -296,17 +291,19 @@ class Enemy extends Entity {
             }
         }
 
-        // Caso o jogador esteja longe ou bloqueado, patrulha com inteligência
         this.decideBallomMove(col, row, map, player, dangerMap);
     }
 
     decideDahlMove(col, row, map, player, dangerMap) {
+        if (!player || !player.isAlive) {
+            this.decideBallomMove(col, row, map, player, dangerMap);
+            return;
+        }
         const playerGrid = player.getGridPos();
 
-        // Verifica se há linha reta direta e desobstruída com o jogador
         if (this.hasLineOfSight(col, row, playerGrid.col, playerGrid.row, map)) {
             this.isCharging = true;
-            this.speed = 1.35; // Aceleração equilibrada durante investida
+            this.speed = 1.35;
 
             const dx = playerGrid.col - col;
             const dy = playerGrid.row - row;
@@ -321,14 +318,13 @@ class Enemy extends Entity {
             return;
         }
 
-        // Sem linha de visão, move-se normalmente
         this.isCharging = false;
         this.speed = this.baseSpeed;
         this.decideBallomMove(col, row, map, player, dangerMap);
     }
 
     hasLineOfSight(x1, y1, x2, y2, map) {
-        if (x1 !== x2 && y1 !== y2) return false; // Precisa estar na mesma linha ou coluna
+        if (x1 !== x2 && y1 !== y2) return false;
 
         if (x1 === x2) {
             const minY = Math.min(y1, y2);
@@ -349,9 +345,12 @@ class Enemy extends Entity {
 
     decideMinvoMove(col, row, map, player, dangerMap) {
         this.speed = this.baseSpeed;
+        if (!player || !player.isAlive) {
+            this.decideBallomMove(col, row, map, player, dangerMap);
+            return;
+        }
         const playerGrid = player.getGridPos();
 
-        // Minvo usa BFS mas considerando blocos SOFT como transitáveis
         const path = this.findPathBFS(col, row, playerGrid.col, playerGrid.row, map, dangerMap, true);
         if (path && path.length > 0 && Math.random() < 0.85) {
             const nextStep = path[0];
@@ -401,8 +400,6 @@ class Enemy extends Entity {
                     const tile = map.grid[nr][nc];
                     const isSolid = tile === CONSTANTS.TILE_SOLID || tile === CONSTANTS.TILE_BOMB;
                     const isSoftBlocked = tile === CONSTANTS.TILE_SOFT && !canPassSoft;
-
-                    // Evita ladrilhos com bombas ativas no caminho a menos que seja o alvo do jogador
                     const isDangerous = dangerMap && dangerMap[key] && (nc !== targetCol || nr !== targetRow);
 
                     if (!isSolid && !isSoftBlocked && !isDangerous) {
@@ -431,7 +428,6 @@ class Enemy extends Entity {
             const nc = col + d.c;
             const nr = row + d.r;
             if (!this.isTilePassable(nc, nr, map)) return false;
-            // Se houver perigo de bomba na direção, evita se houver outras opções
             if (dangerMap && dangerMap[`${nc},${nr}`]) return false;
             return true;
         });
@@ -445,18 +441,15 @@ class Enemy extends Entity {
         this.vx = this.direction.vx * this.speed * timeScale;
         this.vy = this.direction.vy * this.speed * timeScale;
 
-        // Movimento no eixo X
         this.x += this.vx;
         if (this.checkMapCollision(map)) {
             this.x -= this.vx;
-            // Ao bater na parede, cancela investida e reorienta
             this.isCharging = false;
             this.speed = this.baseSpeed;
             this.direction = this.getRandomDirection();
             this.facing = this.direction.name;
         }
 
-        // Movimento no eixo Y
         this.y += this.vy;
         if (this.checkMapCollision(map)) {
             this.y -= this.vy;
@@ -500,10 +493,12 @@ class Enemy extends Entity {
     draw(ctx, spriteLoader) {
         const sprite = spriteLoader ? spriteLoader.get(this.spriteKey) : null;
 
-        // Efeito de piscar quando sofre dano
         if (this.damageTimer > 0 && Math.floor(Date.now() / 60) % 2 === 0) {
             ctx.globalAlpha = 0.4;
         }
+
+        // Se estiver congelado, aplica tom azul gelo
+        const isFrozen = this.freezeTimer > 0;
 
         if (sprite) {
             const frameW = sprite.width / 4;
@@ -513,17 +508,17 @@ class Enemy extends Entity {
             let col = this.animFrame;
 
             if (!this.isAlive) {
-                row = 3; // Linha de explosão/pop de derrota
+                row = 3;
                 col = Math.min(3, Math.floor(this.deathTimer / 110));
             } else {
                 if (this.isCharging) {
-                    row = 2; // Linha de investida / modo ativo
+                    row = 2;
                 } else if (this.facing === 'left' || this.facing === 'right') {
-                    row = 1; // Linha de perfil
+                    row = 1;
                 } else if (this.facing === 'up') {
-                    row = 2; // Linha de costas/subindo
+                    row = 2;
                 } else {
-                    row = 0; // Linha frontal padrão
+                    row = 0;
                 }
             }
 
@@ -531,28 +526,20 @@ class Enemy extends Entity {
             const drawY = this.y - (CONSTANTS.TILE_SIZE - this.height) / 2;
 
             ctx.save();
-            // Espelha horizontalmente se estiver olhando para a esquerda na linha lateral
+            if (isFrozen) {
+                ctx.shadowColor = '#00e5ff';
+                ctx.shadowBlur = 12;
+            }
+
             if (this.facing === 'left' && row === 1 && this.isAlive) {
                 ctx.translate(drawX + CONSTANTS.TILE_SIZE, drawY);
                 ctx.scale(-1, 1);
-                ctx.drawImage(
-                    sprite,
-                    col * frameW, row * frameH, frameW, frameH,
-                    0, 0,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
-                );
+                ctx.drawImage(sprite, col * frameW, row * frameH, frameW, frameH, 0, 0, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE);
             } else {
-                // Efeito de aura suave para o Minvo (fantasma)
                 if (this.type === CONSTANTS.ENEMY_TYPES.MINVO && this.isAlive) {
                     ctx.globalAlpha = 0.85;
                 }
-
-                ctx.drawImage(
-                    sprite,
-                    col * frameW, row * frameH, frameW, frameH,
-                    drawX, drawY,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
-                );
+                ctx.drawImage(sprite, col * frameW, row * frameH, frameW, frameH, drawX, drawY, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE);
             }
             ctx.restore();
         } else {
@@ -560,13 +547,22 @@ class Enemy extends Entity {
                 ctx.globalAlpha = 1.0;
                 return;
             }
-            ctx.fillStyle = this.color;
+            ctx.fillStyle = isFrozen ? '#00e5ff' : this.color;
             ctx.beginPath();
             ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Barra de Vida para inimigos com múltiplos pontos de vida (ex: Golem Laranja)
+        // Ícone de Gelo se estiver congelado
+        if (this.isAlive && isFrozen) {
+            ctx.save();
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('❄️', this.x + this.width / 2, this.y - 4);
+            ctx.restore();
+        }
+
+        // Barra de Vida para inimigos com múltiplos pontos de vida
         if (this.isAlive && this.maxHp > 1) {
             const barW = this.width;
             const barH = 5;
@@ -579,19 +575,14 @@ class Enemy extends Entity {
             ctx.fillRect(barX + 1, barY + 1, (barW - 2) * (this.hp / this.maxHp), barH - 2);
         }
 
-        // Se este inimigo carrega a chave secreta, desenha um brilho e mini-chave acima dele
+        // Mini Chave acima do portador
         if (this.isAlive && this.hasKey) {
             const doorAndKeySprite = spriteLoader ? spriteLoader.get('door_and_key') : null;
             if (doorAndKeySprite) {
                 const kw = doorAndKeySprite.width / 2;
                 const kh = doorAndKeySprite.height / 2;
                 const floatY = Math.sin((Date.now() + this.x) / 150) * 3;
-                ctx.drawImage(
-                    doorAndKeySprite,
-                    0 * kw, 1 * kh, kw, kh,
-                    this.x + this.width / 2 - 8, this.y - 20 + floatY,
-                    16, 16
-                );
+                ctx.drawImage(doorAndKeySprite, 0 * kw, 1 * kh, kw, kh, this.x + this.width / 2 - 8, this.y - 20 + floatY, 16, 16);
             }
         }
 

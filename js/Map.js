@@ -1,14 +1,17 @@
-class Map {
+class LevelMap {
     constructor() {
         this.grid = [];
         this.powerUps = []; // {col, row, type, immunityTimer}
         this.door = null;   // {col, row, isRevealed, isOpen}
         this.keyInCrate = null;
-        this.keyCarrierEnemyIndex = -1;
+        this.currentLevelBiome = 0;
+        
+        // Mecânica de Sudden Death (PvP)
+        this.suddenDeathIndex = 0;
+        this.suddenDeathOrder = [];
     }
 
     spawnPowerUp(col, row, forcedType = null) {
-        // Se já existe um power-up neste tile, não sobrepõe
         for (let p of this.powerUps) {
             if (p.col === col && p.row === row) return;
         }
@@ -16,14 +19,16 @@ class Map {
         let type = forcedType;
         if (!type) {
             const rand = Math.random();
-            if (rand < 0.28) type = 'bomb';
-            else if (rand < 0.56) type = 'fire';
-            else if (rand < 0.74) type = 'speed';
-            else if (rand < 0.88) type = 'heart';
-            else type = 'shield';
+            if (rand < 0.22) type = 'bomb';
+            else if (rand < 0.44) type = 'fire';
+            else if (rand < 0.60) type = 'speed';
+            else if (rand < 0.72) type = 'shield';
+            else if (rand < 0.82) type = 'remote'; // Detonador Remoto [X]
+            else if (rand < 0.90) type = 'ice';    // Bomba de Gelo
+            else if (rand < 0.96) type = 'skull';  // Caveira da Maldição
+            else type = 'heart';
         }
 
-        // immunityTimer protege o item recém-gerado da explosão que quebrou a caixa
         this.powerUps.push({
             col,
             row,
@@ -33,7 +38,6 @@ class Map {
     }
 
     update(dt) {
-        // Reduz tempo de imunidade dos power-ups
         for (let p of this.powerUps) {
             if (p.immunityTimer > 0) {
                 p.immunityTimer -= dt;
@@ -41,27 +45,28 @@ class Map {
         }
     }
 
-    generate(level) {
+    generate(mode = 'campaign', level = 1) {
         this.grid = [];
         this.powerUps = [];
         this.door = null;
         this.keyInCrate = null;
-        this.rasenganCrates = []; // Guarda as 2 caixas com Rasengan por mapa
+        this.rasenganCrates = [];
+        this.currentLevelBiome = Math.min(2, level - 1);
 
         const softWallPositions = [];
 
         for (let row = 0; row < CONSTANTS.GRID_HEIGHT; row++) {
             let rowArray = [];
             for (let col = 0; col < CONSTANTS.GRID_WIDTH; col++) {
-                // Bordas
+                // Bordas externas sólidas
                 if (row === 0 || row === CONSTANTS.GRID_HEIGHT - 1 || 
                     col === 0 || col === CONSTANTS.GRID_WIDTH - 1) {
                     rowArray.push(CONSTANTS.TILE_SOLID);
                     continue;
                 }
 
-                if (level === 3) {
-                    // Arena do Boss
+                // Modo Boss (Fase 3 Campanha)
+                if (mode === 'campaign' && level === 3) {
                     if ((row === 3 || row === 11) && (col === 3 || col === 11)) {
                         rowArray.push(CONSTANTS.TILE_SOLID);
                     } else {
@@ -74,12 +79,24 @@ class Map {
                 if (row % 2 === 0 && col % 2 === 0) {
                     rowArray.push(CONSTANTS.TILE_SOLID);
                 } else {
-                    // Safe zone do jogador (3x3 inicial)
-                    if ((row === 1 && col <= 2) || (col === 1 && row <= 2)) {
+                    // Safe Zones
+                    let isSafe = false;
+
+                    if (mode === 'pvp') {
+                        // Safe zones para P1 (canto superior esquerdo) e P2 (canto inferior direito)
+                        if ((row === 1 && col <= 2) || (col === 1 && row <= 2)) isSafe = true;
+                        if ((row === CONSTANTS.GRID_HEIGHT - 2 && col >= CONSTANTS.GRID_WIDTH - 3) || 
+                            (col === CONSTANTS.GRID_WIDTH - 2 && row >= CONSTANTS.GRID_HEIGHT - 3)) isSafe = true;
+                    } else {
+                        // Safe zone P1 padrão (3x3 inicial)
+                        if ((row === 1 && col <= 2) || (col === 1 && row <= 2)) isSafe = true;
+                    }
+
+                    if (isSafe) {
                         rowArray.push(CONSTANTS.TILE_EMPTY);
                     } else {
-                        // Taxa equilibrada de blocos destrutíveis
-                        if (Math.random() < 0.45) {
+                        const softChance = (mode === 'endless') ? 0.38 : (mode === 'pvp' ? 0.55 : 0.48);
+                        if (Math.random() < softChance) {
                             rowArray.push(CONSTANTS.TILE_SOFT);
                             softWallPositions.push({ col, row });
                         } else {
@@ -91,12 +108,10 @@ class Map {
             this.grid.push(rowArray);
         }
 
-        // Posicionamento da Porta, Chave e exatamente 2 Rasengans por mapa
-        if (level < 3 && softWallPositions.length > 4) {
-            // Embaralha as posições dos blocos de tijolo
+        // Posicionamento da Porta e Chave na Campanha
+        if (mode === 'campaign' && level < 3 && softWallPositions.length > 4) {
             softWallPositions.sort(() => Math.random() - 0.5);
 
-            // Esconde a Porta sob um dos tijolos distantes da base
             const doorPos = softWallPositions[0];
             this.door = {
                 col: doorPos.col,
@@ -105,7 +120,6 @@ class Map {
                 isOpen: false
             };
 
-            // 50% de chance da Chave estar numa caixa ou ser dropada por um inimigo
             if (Math.random() < 0.5) {
                 const keyPos = softWallPositions[1];
                 this.keyInCrate = { col: keyPos.col, row: keyPos.row };
@@ -113,16 +127,61 @@ class Map {
                 this.keyInCrate = null;
             }
 
-            // Exatamente 2 caixas com poder Rasengan escondido
             this.rasenganCrates = [
                 { col: softWallPositions[2].col, row: softWallPositions[2].row },
                 { col: softWallPositions[3].col, row: softWallPositions[3].row }
             ];
-        } else if (level === 3) {
-            // No Boss, spawna 2 itens de Rasengan diretamente na arena
+        } else if (mode === 'campaign' && level === 3) {
             this.spawnPowerUp(3, 7, 'rasengan');
             this.spawnPowerUp(11, 7, 'rasengan');
+            this.spawnPowerUp(7, 3, 'shield');
+            this.spawnPowerUp(7, 11, 'remote');
+        } else if (mode === 'pvp') {
+            this.buildSuddenDeathSpiral();
         }
+    }
+
+    // Cria a espiral de blocos para o Sudden Death no PvP
+    buildSuddenDeathSpiral() {
+        this.suddenDeathIndex = 0;
+        this.suddenDeathOrder = [];
+        
+        let top = 1, bottom = CONSTANTS.GRID_HEIGHT - 2;
+        let left = 1, right = CONSTANTS.GRID_WIDTH - 2;
+
+        while (top <= bottom && left <= right) {
+            for (let c = left; c <= right; c++) this.suddenDeathOrder.push({ col: c, row: top });
+            top++;
+            for (let r = top; r <= bottom; r++) this.suddenDeathOrder.push({ col: right, row: r });
+            right--;
+            if (top <= bottom) {
+                for (let c = right; c >= left; c--) this.suddenDeathOrder.push({ col: c, row: bottom });
+                bottom--;
+            }
+            if (left <= right) {
+                for (let r = bottom; r >= top; r--) this.suddenDeathOrder.push({ col: left, row: r });
+                left++;
+            }
+        }
+    }
+
+    spawnNextSuddenDeathBlock(particleSystem) {
+        if (this.suddenDeathIndex >= this.suddenDeathOrder.length) return null;
+        const target = this.suddenDeathOrder[this.suddenDeathIndex++];
+        this.grid[target.row][target.col] = CONSTANTS.TILE_SOLID;
+
+        const x = target.col * CONSTANTS.TILE_SIZE;
+        const y = target.row * CONSTANTS.TILE_SIZE;
+
+        if (particleSystem) {
+            particleSystem.addScreenShake(6, 200);
+            particleSystem.createBrickDebris(x, y, 1);
+        }
+        if (window.soundManager) {
+            window.soundManager.playBrickCrumble();
+        }
+
+        return target;
     }
 
     draw(ctx, spriteLoader, level, player) {
@@ -130,7 +189,7 @@ class Map {
         const itemSprite = spriteLoader ? spriteLoader.get('items') : null;
         const doorAndKeySprite = spriteLoader ? spriteLoader.get('door_and_key') : null;
 
-        const tileRow = Math.min(2, level - 1); // 0 = Grass/Bricks, 1 = Dungeon/Crate, 2 = Cyber Arena
+        const tileRow = this.currentLevelBiome;
 
         for (let row = 0; row < CONSTANTS.GRID_HEIGHT; row++) {
             for (let col = 0; col < CONSTANTS.GRID_WIDTH; col++) {
@@ -142,7 +201,7 @@ class Map {
                     const tw = tileSprite.width / 3;
                     const th = tileSprite.height / 3;
 
-                    // Desenha o chão primeiro
+                    // Chão
                     ctx.drawImage(
                         tileSprite,
                         2 * tw, tileRow * th, tw, th,
@@ -150,13 +209,13 @@ class Map {
                         CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                     );
 
-                    // Desenha a PORTA se o bloco sobre ela já foi destruído
+                    // Porta Secreta
                     if (this.door && this.door.col === col && this.door.row === row && tile === CONSTANTS.TILE_EMPTY) {
                         this.door.isRevealed = true;
                         this.drawDoorTile(ctx, doorAndKeySprite, x, y, player);
                     }
 
-                    // Desenha Paredes e Tijolos
+                    // Paredes e Tijolos
                     if (tile === CONSTANTS.TILE_SOLID) {
                         ctx.drawImage(
                             tileSprite,
@@ -184,7 +243,7 @@ class Map {
             }
         }
 
-        // Desenha Power-ups caídos no chão
+        // Desenha Power-ups
         for (let p of this.powerUps) {
             const px = p.col * CONSTANTS.TILE_SIZE;
             const py = p.row * CONSTANTS.TILE_SIZE;
@@ -193,21 +252,13 @@ class Map {
             if (p.type === 'key' && doorAndKeySprite) {
                 const kw = doorAndKeySprite.width / 2;
                 const kh = doorAndKeySprite.height / 2;
-                ctx.drawImage(
-                    doorAndKeySprite,
-                    0 * kw, 1 * kh, kw, kh,
-                    px + 4, py + 4 + floatOffset,
-                    CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8
-                );
+                ctx.drawImage(doorAndKeySprite, 0 * kw, 1 * kh, kw, kh, px + 4, py + 4 + floatOffset, CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8);
+
             } else if (p.type === 'shield' && doorAndKeySprite) {
                 const kw = doorAndKeySprite.width / 2;
                 const kh = doorAndKeySprite.height / 2;
-                ctx.drawImage(
-                    doorAndKeySprite,
-                    1 * kw, 1 * kh, kw, kh,
-                    px + 4, py + 4 + floatOffset,
-                    CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8
-                );
+                ctx.drawImage(doorAndKeySprite, 1 * kw, 1 * kh, kw, kh, px + 4, py + 4 + floatOffset, CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8);
+
             } else if (p.type === 'rasengan') {
                 const rasenganSprite = spriteLoader ? spriteLoader.get('rasengan') : null;
                 if (rasenganSprite) {
@@ -220,12 +271,7 @@ class Map {
                     ctx.save();
                     ctx.shadowColor = '#00e5ff';
                     ctx.shadowBlur = 14;
-                    ctx.drawImage(
-                        rasenganSprite,
-                        sx, sy, sw, sh,
-                        px + 3, py + 3 + floatOffset,
-                        CONSTANTS.TILE_SIZE - 6, CONSTANTS.TILE_SIZE - 6
-                    );
+                    ctx.drawImage(rasenganSprite, sx, sy, sw, sh, px + 3, py + 3 + floatOffset, CONSTANTS.TILE_SIZE - 6, CONSTANTS.TILE_SIZE - 6);
                     ctx.restore();
                 } else {
                     ctx.fillStyle = '#00e5ff';
@@ -233,6 +279,40 @@ class Map {
                     ctx.arc(px + CONSTANTS.TILE_SIZE/2, py + CONSTANTS.TILE_SIZE/2 + floatOffset, 14, 0, Math.PI * 2);
                     ctx.fill();
                 }
+            } else if (p.type === 'remote') {
+                // Ícone Detonador Remoto
+                ctx.save();
+                ctx.shadowColor = '#e91e63';
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = 'rgba(233, 30, 99, 0.25)';
+                ctx.beginPath();
+                ctx.arc(px + CONSTANTS.TILE_SIZE/2, py + CONSTANTS.TILE_SIZE/2 + floatOffset, 16, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.font = '22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('⏱️', px + CONSTANTS.TILE_SIZE/2, py + CONSTANTS.TILE_SIZE/2 + floatOffset + 8);
+                ctx.restore();
+
+            } else if (p.type === 'skull') {
+                // Ícone Caveira da Maldição
+                ctx.save();
+                ctx.shadowColor = '#ab47bc';
+                ctx.shadowBlur = 14;
+                ctx.font = '22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('💀', px + CONSTANTS.TILE_SIZE/2, py + CONSTANTS.TILE_SIZE/2 + floatOffset + 8);
+                ctx.restore();
+
+            } else if (p.type === 'ice') {
+                // Ícone Bomba de Gelo
+                ctx.save();
+                ctx.shadowColor = '#00e5ff';
+                ctx.shadowBlur = 14;
+                ctx.font = '22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('❄️', px + CONSTANTS.TILE_SIZE/2, py + CONSTANTS.TILE_SIZE/2 + floatOffset + 8);
+                ctx.restore();
+
             } else if (itemSprite) {
                 const iw = itemSprite.width / 2;
                 const ih = itemSprite.height / 2;
@@ -243,15 +323,7 @@ class Map {
                 else if (p.type === 'speed') { sx = 0; sy = 1; }
                 else if (p.type === 'heart') { sx = 1; sy = 1; }
 
-                ctx.drawImage(
-                    itemSprite,
-                    sx * iw, sy * ih, iw, ih,
-                    px + 4, py + 4 + floatOffset,
-                    CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8
-                );
-            } else {
-                ctx.fillStyle = p.type === 'key' ? '#ffd700' : '#ffff00';
-                ctx.fillRect(px + 8, py + 8, CONSTANTS.TILE_SIZE - 16, CONSTANTS.TILE_SIZE - 16);
+                ctx.drawImage(itemSprite, sx * iw, sy * ih, iw, ih, px + 4, py + 4 + floatOffset, CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8);
             }
         }
     }
@@ -265,17 +337,10 @@ class Map {
 
         const dw = doorAndKeySprite.width / 2;
         const dh = doorAndKeySprite.height / 2;
-
-        // Se o jogador possui a chave, a porta brilha aberta com o portal místico!
         const isOpen = player && player.hasKey;
         const colIdx = isOpen ? 1 : 0;
         const rowIdx = 0;
 
-        ctx.drawImage(
-            doorAndKeySprite,
-            colIdx * dw, rowIdx * dh, dw, dh,
-            x, y,
-            CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
-        );
+        ctx.drawImage(doorAndKeySprite, colIdx * dw, rowIdx * dh, dw, dh, x, y, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE);
     }
 }

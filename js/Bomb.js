@@ -1,5 +1,5 @@
 class Bomb {
-    constructor(x, y, col, row, radius, owner) {
+    constructor(x, y, col, row, radius, owner, isRemote = false, isIce = false) {
         this.x = x;
         this.y = y;
         this.col = col;
@@ -8,15 +8,17 @@ class Bomb {
         this.height = CONSTANTS.TILE_SIZE;
         this.radius = radius;
         this.owner = owner;
+        this.isRemote = isRemote;
+        this.isIce = isIce;
         
-        this.timer = 2400;
+        this.timer = isRemote ? 15000 : 2400; // Bomba remota espera comando manual (failsafe de 15s)
         this.exploded = false;
         this.toBeRemoved = false;
         
         // Propriedades do Chute de Bomba (Bomb Kick)
         this.isSliding = false;
         this.slideDir = null; // 'up', 'down', 'left', 'right'
-        this.slideSpeed = 4.8; // Velocidade natural de deslizamento ao chutar
+        this.slideSpeed = 5.2; // Velocidade natural e suave de deslizamento ao chutar
         
         this.blasts = [];
         this.animTimer = 0;
@@ -29,7 +31,7 @@ class Bomb {
         }
     }
 
-    kick(dir, map, bombsArray, enemies, boss) {
+    kick(dir, map, bombsArray, enemies, boss, particleSystem) {
         if (this.exploded || this.toBeRemoved) return false;
         
         // Checa se o próximo tile na direção do chute está livre
@@ -69,6 +71,11 @@ class Bomb {
         if (window.soundManager) {
             window.soundManager.playBombKick();
         }
+
+        if (particleSystem) {
+            particleSystem.addFloatingText(this.x + 24, this.y - 10, "KICK!", "#ff9800", 11, true);
+        }
+
         return true;
     }
 
@@ -87,9 +94,18 @@ class Bomb {
         }
     }
 
-    update(dt, map, bombsArray, enemies, boss) {
+    detonate(map, particleSystem) {
+        if (!this.exploded && !this.toBeRemoved) {
+            if (this.isSliding) {
+                this.stopSliding(map);
+            }
+            this.explode(map, particleSystem);
+        }
+    }
+
+    update(dt, map, bombsArray, enemies, boss, particleSystem) {
         this.animTimer += dt;
-        if (this.animTimer > 100) {
+        if (this.animTimer > 90) {
             this.animFrame = (this.animFrame + 1) % 4;
             this.animTimer = 0;
         }
@@ -114,7 +130,6 @@ class Bomb {
             this.x += vx;
             this.y += vy;
 
-            // Atualiza col/row aproximados
             this.col = Math.max(0, Math.min(CONSTANTS.GRID_WIDTH - 1, Math.round(this.x / CONSTANTS.TILE_SIZE)));
             this.row = Math.max(0, Math.min(CONSTANTS.GRID_HEIGHT - 1, Math.round(this.y / CONSTANTS.TILE_SIZE)));
 
@@ -131,13 +146,11 @@ class Bomb {
 
             let hitObstacle = false;
 
-            // Limites da arena
             if (checkCol < 0 || checkCol >= CONSTANTS.GRID_WIDTH || checkRow < 0 || checkRow >= CONSTANTS.GRID_HEIGHT) {
                 hitObstacle = true;
             } else {
                 const tile = map.grid[checkRow][checkCol];
                 if (tile === CONSTANTS.TILE_SOLID || tile === CONSTANTS.TILE_SOFT) {
-                    // Checa se a ponta da bomba já tocou o bloco
                     if (this.slideDir === 'right' && this.x + this.width >= checkCol * CONSTANTS.TILE_SIZE) hitObstacle = true;
                     else if (this.slideDir === 'left' && this.x <= (checkCol + 1) * CONSTANTS.TILE_SIZE) hitObstacle = true;
                     else if (this.slideDir === 'down' && this.y + this.height >= checkRow * CONSTANTS.TILE_SIZE) hitObstacle = true;
@@ -145,19 +158,15 @@ class Bomb {
                 }
             }
 
-            // Colisão com outras bombas
             if (bombsArray) {
                 for (let b of bombsArray) {
-                    if (b !== this && !b.exploded && !b.toBeRemoved) {
-                        if (this.intersects(b)) {
-                            hitObstacle = true;
-                            break;
-                        }
+                    if (b !== this && !b.exploded && !b.toBeRemoved && this.intersects(b)) {
+                        hitObstacle = true;
+                        break;
                     }
                 }
             }
 
-            // Colisão com Inimigos / Boss
             if (enemies) {
                 for (let e of enemies) {
                     if (e.isAlive && this.intersects(e)) {
@@ -186,12 +195,13 @@ class Bomb {
             return;
         }
 
+        // Bombas normais contam o tempo até explodir; bombas remotas só detonam por tempo após 15s
         this.timer -= dt;
         if (this.timer <= 0) {
             if (this.isSliding) {
                 this.stopSliding(map);
             }
-            this.explode(map);
+            this.explode(map, particleSystem);
         }
     }
 
@@ -204,16 +214,30 @@ class Bomb {
         );
     }
 
-    explode(map) {
+    explode(map, particleSystem) {
+        if (this.exploded) return;
         this.exploded = true;
         this.timer = 500;
         
         if (window.soundManager) {
-            window.soundManager.playExplosion();
+            if (this.isIce) {
+                window.soundManager.playFreeze();
+            } else {
+                window.soundManager.playExplosion();
+            }
         }
         
         if (this.owner) {
             this.owner.bombsActive = Math.max(0, this.owner.bombsActive - 1);
+        }
+
+        const cx = this.col * CONSTANTS.TILE_SIZE + CONSTANTS.TILE_SIZE / 2;
+        const cy = this.row * CONSTANTS.TILE_SIZE + CONSTANTS.TILE_SIZE / 2;
+
+        if (particleSystem) {
+            particleSystem.addScreenShake(6, 220);
+            particleSystem.createShockwave(cx, cy, 45, this.isIce ? 'rgba(0, 229, 255, 0.85)' : 'rgba(255, 170, 0, 0.85)');
+            particleSystem.createExplosionSparks(cx, cy, this.isIce ? '#00e5ff' : '#ff9800', 16);
         }
 
         this.blasts.push({ col: this.col, row: this.row, type: 'center' });
@@ -248,13 +272,24 @@ class Bomb {
                 if (tile === CONSTANTS.TILE_SOFT) {
                     map.grid[targetRow][targetCol] = CONSTANTS.TILE_EMPTY;
                     this.blasts.push({ col: targetCol, row: targetRow, type: blastType });
+
+                    // Dispara estilhaços de tijolos com o sistema de partículas
+                    if (particleSystem) {
+                        const bx = targetCol * CONSTANTS.TILE_SIZE;
+                        const by = targetRow * CONSTANTS.TILE_SIZE;
+                        particleSystem.createBrickDebris(bx, by, map.currentLevelBiome || 0);
+                    }
+                    if (window.soundManager) {
+                        window.soundManager.playBrickCrumble();
+                    }
+
                     if (map.spawnPowerUp) {
-                        // Verifica se este bloco continha a chave secreta
+                        // Verifica itens especiais e drops de bloco
                         if (map.keyInCrate && map.keyInCrate.col === targetCol && map.keyInCrate.row === targetRow) {
                             map.spawnPowerUp(targetCol, targetRow, 'key');
                         } else if (map.rasenganCrates && map.rasenganCrates.some(c => c.col === targetCol && c.row === targetRow)) {
                             map.spawnPowerUp(targetCol, targetRow, 'rasengan');
-                        } else if (Math.random() < 0.70) {
+                        } else if (Math.random() < 0.72) {
                             map.spawnPowerUp(targetCol, targetRow);
                         }
                     }
@@ -276,12 +311,31 @@ class Bomb {
             const frameH = sprite.height / 4;
 
             if (!this.exploded) {
+                ctx.save();
+                // Efeito especial de brilho se for bomba remota ou congelante
+                if (this.isRemote) {
+                    ctx.shadowColor = '#e91e63';
+                    ctx.shadowBlur = 12;
+                } else if (this.isIce) {
+                    ctx.shadowColor = '#00e5ff';
+                    ctx.shadowBlur = 12;
+                }
+
                 ctx.drawImage(
                     sprite,
                     this.animFrame * frameW, 0, frameW, frameH,
                     this.x, this.y,
                     CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                 );
+
+                // Indicador de antena piscante para bomba remota
+                if (this.isRemote) {
+                    ctx.fillStyle = (Math.floor(Date.now() / 150) % 2 === 0) ? '#ff1744' : '#00e676';
+                    ctx.beginPath();
+                    ctx.arc(this.x + CONSTANTS.TILE_SIZE / 2, this.y + 6, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
             } else {
                 for (let blast of this.blasts) {
                     const bx = blast.col * CONSTANTS.TILE_SIZE;
@@ -317,7 +371,7 @@ class Bomb {
             }
         } else {
             if (!this.exploded) {
-                ctx.fillStyle = CONSTANTS.COLORS.BOMB;
+                ctx.fillStyle = this.isRemote ? '#d81b60' : CONSTANTS.COLORS.BOMB;
                 ctx.beginPath();
                 ctx.arc(this.x + CONSTANTS.TILE_SIZE/2, this.y + CONSTANTS.TILE_SIZE/2, CONSTANTS.TILE_SIZE*0.4, 0, Math.PI * 2);
                 ctx.fill();

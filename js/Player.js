@@ -1,29 +1,33 @@
 class Player extends Entity {
-    constructor(x, y, character = 'hero') {
-        // Hitbox ajustada para movimentação fluida nos corredores de 48px
+    constructor(x, y, character = 'hero', playerIndex = 1) {
         const boxSize = CONSTANTS.TILE_SIZE * 0.62;
         super(x, y, boxSize, boxSize);
         
-        this.character = character; // 'hero', 'hero_naruto', 'hero_sasuke' ou 'hero_warrior'
+        this.character = character; // 'hero', 'hero_naruto', 'hero_sasuke', 'hero_warrior'
+        this.playerIndex = playerIndex; // 1 (P1) ou 2 (P2)
         
         if (this.character === 'hero_naruto') {
             this.color = '#ff9800';
-            this.speed = 2.2; // Ninja ágil
+            this.baseSpeed = 2.4;
+            this.speed = 2.4;
             this.bombCapacity = 1;
             this.bombRadius = 2;
         } else if (this.character === 'hero_sasuke') {
             this.color = '#1a237e';
-            this.speed = 2.3; // Shinobi veloz
+            this.baseSpeed = 2.5;
+            this.speed = 2.5;
             this.bombCapacity = 1;
             this.bombRadius = 2;
         } else if (this.character === 'hero_warrior') {
             this.color = '#c8860a';
-            this.speed = 2.4; // Guerreiro veloz e resistente
+            this.baseSpeed = 2.6;
+            this.speed = 2.6;
             this.bombCapacity = 1;
-            this.bombRadius = 3; // Raio de fogo maior desde o início!
+            this.bombRadius = 3;
         } else {
-            this.color = CONSTANTS.COLORS.PLAYER;
-            this.speed = 2.0; // Clássico equilibrado e preciso
+            this.color = (this.playerIndex === 2) ? '#00e5ff' : CONSTANTS.COLORS.PLAYER;
+            this.baseSpeed = 2.2;
+            this.speed = 2.2;
             this.bombCapacity = 1;
             this.bombRadius = 2;
         }
@@ -36,12 +40,14 @@ class Player extends Entity {
             left: false,
             right: false,
             action: false,
-            special: false // Tecla Z para Poder Especial (Rasengan / Chidori)
+            special: false,
+            remote: false
         };
         
         this.actionPressed = false;
         this.specialPressed = false;
-        this.direction = 'down'; // 'down', 'up', 'left', 'right'
+        this.remotePressed = false;
+        this.direction = 'down';
         this.animFrame = 0;
         this.animTimer = 0;
         this.isMoving = false;
@@ -53,7 +59,25 @@ class Player extends Entity {
         this.hasShield = false;
         this.shieldTimer = 0;
         this.spawnShieldTimer = 1500; // 1.5s de imunidade inicial ao nascer
-        this.rasenganAmmo = 0; // Chakra para golpe especial (Rasengan / Chidori)
+        this.rasenganAmmo = 0;
+        this.hasRemoteTrigger = false;
+        this.hasIceBomb = false;
+
+        // Sistema de Maldição da Caveira (Skull Curse)
+        this.curseType = null;
+        this.curseTimer = 0;
+        this.diarrheaTimer = 0;
+
+        // Score e Vitórias (especialmente para modo PvP)
+        this.pvpWins = 0;
+    }
+
+    applyCurse(curseType, duration = 8000) {
+        this.curseType = curseType;
+        this.curseTimer = duration;
+        if (window.soundManager) {
+            window.soundManager.playCurseSkull();
+        }
     }
 
     handleInput(map, bombsArray, game, dt = 16.6667) {
@@ -63,22 +87,34 @@ class Player extends Entity {
         let inputX = 0;
         let inputY = 0;
 
-        if (this.keys.left) inputX -= 1;
-        if (this.keys.right) inputX += 1;
-        if (this.keys.up) inputY -= 1;
-        if (this.keys.down) inputY += 1;
+        // Efeito de maldição de controles invertidos
+        const isInverted = (this.curseType === CONSTANTS.CURSE_TYPES.INVERTED && this.curseTimer > 0);
+
+        if (this.keys.left) inputX += isInverted ? 1 : -1;
+        if (this.keys.right) inputX += isInverted ? -1 : 1;
+        if (this.keys.up) inputY += isInverted ? 1 : -1;
+        if (this.keys.down) inputY += isInverted ? -1 : 1;
+
+        // Modificador de velocidade da maldição
+        let effectiveSpeed = this.speed;
+        if (this.curseTimer > 0) {
+            if (this.curseType === CONSTANTS.CURSE_TYPES.SLOW) {
+                effectiveSpeed = Math.max(1.0, this.speed * 0.5);
+            } else if (this.curseType === CONSTANTS.CURSE_TYPES.FAST) {
+                effectiveSpeed = this.speed * 1.6;
+            }
+        }
 
         const timeScale = Math.min(dt, 50) / 16.6667;
 
         if (inputX !== 0 && inputY !== 0) {
-            // Movimento diagonal normalizado
-            this.vx = inputX * this.speed * 0.72 * timeScale;
-            this.vy = inputY * this.speed * 0.72 * timeScale;
+            this.vx = inputX * effectiveSpeed * 0.72 * timeScale;
+            this.vy = inputY * effectiveSpeed * 0.72 * timeScale;
         } else if (inputX !== 0) {
-            this.vx = inputX * this.speed * timeScale;
+            this.vx = inputX * effectiveSpeed * timeScale;
             this.direction = inputX > 0 ? 'right' : 'left';
         } else if (inputY !== 0) {
-            this.vy = inputY * this.speed * timeScale;
+            this.vy = inputY * effectiveSpeed * timeScale;
             this.direction = inputY > 0 ? 'down' : 'up';
         }
 
@@ -90,7 +126,7 @@ class Player extends Entity {
 
         this.isMoving = (this.vx !== 0 || this.vy !== 0);
 
-        // Plantar Bomba (Barra de Espaço)
+        // Plantar Bomba Manualmente
         if (this.keys.action && !this.actionPressed) {
             this.actionPressed = true;
             this.plantBomb(map, bombsArray);
@@ -98,55 +134,150 @@ class Player extends Entity {
             this.actionPressed = false;
         }
 
-        // Disparar Jutsu Especial (Tecla Z - Rasengan ou Chidori)
+        // Maldição de Diarreia de Bombas (Planta bombas automaticamente)
+        if (this.curseType === CONSTANTS.CURSE_TYPES.DIARRHEA && this.curseTimer > 0) {
+            this.diarrheaTimer += dt;
+            if (this.diarrheaTimer > 380) {
+                this.plantBomb(map, bombsArray);
+                this.diarrheaTimer = 0;
+            }
+        }
+
+        // Disparar Golpe Especial (Tecla Z / L)
         if (this.keys.special && !this.specialPressed) {
             this.specialPressed = true;
             this.castSpecial(game);
         } else if (!this.keys.special) {
             this.specialPressed = false;
         }
+
+        // Detonar Bombas Remotamente (Tecla X / K)
+        if (this.keys.remote && !this.remotePressed) {
+            this.remotePressed = true;
+            this.detonateRemoteBombs(map, bombsArray, game);
+        } else if (!this.keys.remote) {
+            this.remotePressed = false;
+        }
+    }
+
+    detonateRemoteBombs(map, bombsArray, game) {
+        if (!this.hasRemoteTrigger || !bombsArray) return;
+        let detonatedCount = 0;
+        for (let b of bombsArray) {
+            if (b.owner === this && b.isRemote && !b.exploded && !b.toBeRemoved) {
+                b.detonate(map, game?.particleSystem);
+                detonatedCount++;
+            }
+        }
+        if (detonatedCount > 0 && window.soundManager) {
+            window.soundManager.playRemoteTrigger();
+        }
     }
 
     castSpecial(game) {
         if (this.rasenganAmmo <= 0 || !game) return;
         this.rasenganAmmo--;
-        if (game.playerStats) {
+        if (game.playerStats && this.playerIndex === 1) {
             game.playerStats.rasenganAmmo = this.rasenganAmmo;
         }
-        this.castTimer = 280; // Duração do efeito visual de lançamento
+        this.castTimer = 350;
 
         const pSize = CONSTANTS.TILE_SIZE * 0.85;
         const startX = this.x + (this.width - pSize) / 2;
         const startY = this.y + (this.height - pSize) / 2;
 
         if (this.character === 'hero_sasuke') {
-            // Dispara Chidori elétrico do Sasuke
+            // Chidori Elétrico
             const proj = new ChidoriProjectile(startX, startY, this.direction, this);
             if (!game.chidoris) game.chidoris = [];
             game.chidoris.push(proj);
+            if (window.soundManager) window.soundManager.playChidoriLaunch();
+            if (game.particleSystem) game.particleSystem.addScreenShake(8, 200);
 
-            if (window.soundManager) {
-                window.soundManager.playChidoriLaunch();
-            }
+        } else if (this.character === 'hero_warrior') {
+            // Ciclone Flamejante 360° do Guerreiro
+            this.castWarriorFlameCyclone(game);
+
+        } else if (this.character === 'hero') {
+            // Bomberman Clássico: Mega Bomba Instantânea com Raio Triplo
+            this.castMegaBomb(game);
+
         } else {
-            // Dispara Rasengan do Naruto / Herói
+            // Rasengan do Naruto
             const proj = new RasenganProjectile(startX, startY, this.direction, this);
             if (!game.rasengans) game.rasengans = [];
             game.rasengans.push(proj);
-
-            if (window.soundManager) {
-                window.soundManager.playRasenganLaunch();
-            }
+            if (window.soundManager) window.soundManager.playRasenganLaunch();
+            if (game.particleSystem) game.particleSystem.addScreenShake(8, 200);
         }
 
         game.updateUI();
+    }
+
+    castWarriorFlameCyclone(game) {
+        if (window.soundManager) window.soundManager.playWarriorSpin();
+        if (game.particleSystem) {
+            game.particleSystem.addScreenShake(10, 300);
+            game.particleSystem.createShockwave(this.x + this.width/2, this.y + this.height/2, 80, 'rgba(255, 100, 0, 0.9)');
+            game.particleSystem.createExplosionSparks(this.x + this.width/2, this.y + this.height/2, '#ff5722', 25);
+            game.particleSystem.addFloatingText(this.x + this.width/2, this.y - 15, "FIRE CYCLONE!", "#ff5722", 14, true);
+        }
+
+        const myGrid = this.getGridPos();
+        // Atinge área 3x3 ao redor do Guerreiro
+        for (let r = myGrid.row - 1; r <= myGrid.row + 1; r++) {
+            for (let c = myGrid.col - 1; c <= myGrid.col + 1; c++) {
+                if (r < 0 || r >= CONSTANTS.GRID_HEIGHT || c < 0 || c >= CONSTANTS.GRID_WIDTH) continue;
+                
+                // Quebra blocos de tijolo
+                if (game.map.grid[r][c] === CONSTANTS.TILE_SOFT) {
+                    game.map.grid[r][c] = CONSTANTS.TILE_EMPTY;
+                    if (game.particleSystem) {
+                        game.particleSystem.createBrickDebris(c * CONSTANTS.TILE_SIZE, r * CONSTANTS.TILE_SIZE, game.map.currentLevelBiome || 0);
+                    }
+                    if (game.map.spawnPowerUp && Math.random() < 0.6) {
+                        game.map.spawnPowerUp(c, r);
+                    }
+                    game.score += 30;
+                }
+
+                // Causa dano massivo a inimigos na área
+                const hitBox = { x: c * CONSTANTS.TILE_SIZE, y: r * CONSTANTS.TILE_SIZE, width: CONSTANTS.TILE_SIZE, height: CONSTANTS.TILE_SIZE };
+                if (game.enemies) {
+                    for (let enemy of game.enemies) {
+                        if (enemy.isAlive && enemy.checkCollision(hitBox)) {
+                            const isDead = enemy.takeDamage(3, game.map);
+                            if (isDead) {
+                                game.score += enemy.scoreValue || 200;
+                            }
+                        }
+                    }
+                }
+                if (game.boss && game.boss.isAlive && game.boss.checkCollision(hitBox)) {
+                    game.boss.takeDamage(3);
+                }
+            }
+        }
+    }
+
+    castMegaBomb(game) {
+        const gridPos = this.getGridPos();
+        const megaRadius = this.bombRadius + 3;
+        const b = new Bomb(gridPos.col * CONSTANTS.TILE_SIZE, gridPos.row * CONSTANTS.TILE_SIZE, gridPos.col, gridPos.row, megaRadius, this, false, false);
+        game.bombs.push(b);
+        game.map.grid[gridPos.row][gridPos.col] = CONSTANTS.TILE_BOMB;
+        this.bombsActive++;
+
+        if (window.soundManager) window.soundManager.playBombDrop();
+        if (game.particleSystem) {
+            game.particleSystem.addFloatingText(this.x + 24, this.y - 12, "MEGA BOMB!", "#00e5ff", 13, true);
+        }
     }
 
     plantBomb(map, bombsArray) {
         if (this.bombsActive >= this.bombCapacity) return;
 
         const gridPos = this.getGridPos();
-        // Não planta se já tiver bomba no mesmo tile
         for (let b of bombsArray) {
             if (b.col === gridPos.col && b.row === gridPos.row && !b.toBeRemoved) {
                 return;
@@ -156,7 +287,7 @@ class Player extends Entity {
         const bombX = gridPos.col * CONSTANTS.TILE_SIZE;
         const bombY = gridPos.row * CONSTANTS.TILE_SIZE;
 
-        const newBomb = new Bomb(bombX, bombY, gridPos.col, gridPos.row, this.bombRadius, this);
+        const newBomb = new Bomb(bombX, bombY, gridPos.col, gridPos.row, this.bombRadius, this, this.hasRemoteTrigger, this.hasIceBomb);
         bombsArray.push(newBomb);
         map.grid[gridPos.row][gridPos.col] = CONSTANTS.TILE_BOMB;
         this.bombsActive++;
@@ -176,6 +307,14 @@ class Player extends Entity {
             this.castTimer -= dt;
         }
 
+        // Atualiza maldição da caveira
+        if (this.curseTimer > 0) {
+            this.curseTimer -= dt;
+            if (this.curseTimer <= 0) {
+                this.curseType = null;
+            }
+        }
+
         // Atualiza temporizadores de escudo
         if (this.spawnShieldTimer > 0) {
             this.spawnShieldTimer -= dt;
@@ -192,7 +331,7 @@ class Player extends Entity {
         // Atualiza animação de passos
         if (this.isMoving) {
             this.animTimer += dt;
-            const frameDelay = (this.character === 'hero_warrior') ? 80 : 110;
+            const frameDelay = (this.character === 'hero_warrior') ? 70 : 100;
             const maxFrames  = (this.character === 'hero_warrior') ? 8  : 4;
             if (this.animTimer > frameDelay) {
                 this.animFrame = (this.animFrame + 1) % maxFrames;
@@ -202,33 +341,27 @@ class Player extends Entity {
             this.animFrame = 0;
         }
 
-        // Executa movimento fluido com assistência de quinas (Corner Alignment)
         this.moveSmoothly(map, bombsArray, game, dt);
     }
 
     moveSmoothly(map, bombsArray, game, dt = 16.6667) {
-        // Movimento independente no eixo X
         if (this.vx !== 0) {
             this.x += this.vx;
             if (this.checkCollisions(map, bombsArray, game)) {
                 this.x -= this.vx;
-                // Ao bater em uma quina no eixo X, alinha suavemente no eixo Y
                 this.assistCornerY(map, bombsArray, game, dt);
             }
         }
 
-        // Movimento independente no eixo Y
         if (this.vy !== 0) {
             this.y += this.vy;
             if (this.checkCollisions(map, bombsArray, game)) {
                 this.y -= this.vy;
-                // Ao bater em uma quina no eixo Y, alinha suavemente no eixo X
                 this.assistCornerX(map, bombsArray, game, dt);
             }
         }
     }
 
-    // Desliza o jogador automaticamente para dentro do corredor mais próximo
     assistCornerY(map, bombsArray, game, dt = 16.6667) {
         const centerY = this.y + this.height / 2;
         const tileRow = Math.floor(centerY / CONSTANTS.TILE_SIZE);
@@ -236,9 +369,8 @@ class Player extends Entity {
         const diff = tileCenterY - centerY;
         const timeScale = Math.min(dt, 50) / 16.6667;
 
-        // Se estiver a até 18px do centro do corredor, desliza suavemente
-        if (Math.abs(diff) < 18) {
-            const slideStep = Math.sign(diff) * Math.min(Math.abs(diff), this.speed * 0.75 * timeScale);
+        if (Math.abs(diff) < 20) {
+            const slideStep = Math.sign(diff) * Math.min(Math.abs(diff), this.speed * 0.85 * timeScale);
             this.y += slideStep;
             if (this.checkCollisions(map, bombsArray, game)) {
                 this.y -= slideStep;
@@ -253,8 +385,8 @@ class Player extends Entity {
         const diff = tileCenterX - centerX;
         const timeScale = Math.min(dt, 50) / 16.6667;
 
-        if (Math.abs(diff) < 18) {
-            const slideStep = Math.sign(diff) * Math.min(Math.abs(diff), this.speed * 0.75 * timeScale);
+        if (Math.abs(diff) < 20) {
+            const slideStep = Math.sign(diff) * Math.min(Math.abs(diff), this.speed * 0.85 * timeScale);
             this.x += slideStep;
             if (this.checkCollisions(map, bombsArray, game)) {
                 this.x -= slideStep;
@@ -295,9 +427,8 @@ class Player extends Entity {
                 if (!bomb.exploded && !bomb.toBeRemoved) {
                     if (!bomb.overlappingEntities.has(this)) {
                         if (this.checkCollision(bomb)) {
-                            // Tenta chutar a bomba na direção do movimento atual
                             if (this.isMoving && !bomb.isSliding) {
-                                bomb.kick(this.direction, map, bombsArray, game?.enemies, game?.boss);
+                                bomb.kick(this.direction, map, bombsArray, game?.enemies, game?.boss, game?.particleSystem);
                             }
                             return true;
                         }
@@ -314,20 +445,12 @@ class Player extends Entity {
         const sprite = spriteLoader ? spriteLoader.get(spriteName) : null;
         const doorAndKeySprite = spriteLoader ? spriteLoader.get('door_and_key') : null;
         
-        // Efeito de piscar durante escudo de nascimento ou invulnerabilidade
         const isInvulnerable = (this.spawnShieldTimer > 0 || this.hasShield);
         if (isInvulnerable && Math.floor(Date.now() / 80) % 2 === 0) {
             ctx.globalAlpha = 0.6;
         }
 
         if (sprite && this.character === 'hero_warrior') {
-            // Sprite sheet do Guerreiro: 8 colunas × 8 linhas
-            // Linha 0: caminhar para baixo (para frente)
-            // Linha 1: caminhar para cima
-            // Linha 2: caminhar para esquerda
-            // Linha 3: caminhar para direita
-            // Linha 4-5: idle / idle alternativo
-            // Linha 7: morte
             const COLS = 8;
             const ROWS = 8;
             const frameW = sprite.width / COLS;
@@ -337,7 +460,6 @@ class Player extends Entity {
             let colFrame = this.isMoving ? (this.animFrame % COLS) : 0;
 
             if (!this.isAlive) {
-                // Animação de morte: linha 7, progride da esq para dir
                 row = 7;
                 colFrame = Math.min(COLS - 1, Math.floor(this.deathTimer / 100));
                 ctx.save();
@@ -354,16 +476,12 @@ class Player extends Entity {
                 return;
             }
 
-            // Seleciona linha por direção
             if (this.direction === 'down')       { row = 0; flipH = false; }
             else if (this.direction === 'up')    { row = 1; flipH = false; }
             else if (this.direction === 'left')  { row = 2; flipH = false; }
             else if (this.direction === 'right') { row = 2; flipH = true;  }
 
-            // Idle: usa linha de baixo, frame 0 estático
             if (!this.isMoving) {
-                colFrame = 0;
-                // Pequena respiração: alterna entre frame 0 e 1 lentamente
                 const idlePulse = Math.floor(Date.now() / 500) % 2;
                 colFrame = idlePulse;
             }
@@ -372,8 +490,6 @@ class Player extends Entity {
             const drawY = this.y - (CONSTANTS.TILE_SIZE - this.height) / 2 - 8;
 
             ctx.save();
-
-            // Aura dourada pulsante enquanto ativo (sempre no guerreiro!)
             const auraPulse = 0.85 + Math.sin(Date.now() / 300) * 0.15;
             ctx.shadowColor = 'rgba(255, 200, 50, 0.5)';
             ctx.shadowBlur = 8 * auraPulse;
@@ -381,24 +497,13 @@ class Player extends Entity {
             if (flipH) {
                 ctx.translate(drawX + CONSTANTS.TILE_SIZE, drawY);
                 ctx.scale(-1, 1);
-                ctx.drawImage(
-                    sprite,
-                    colFrame * frameW, row * frameH, frameW, frameH,
-                    0, 0,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8
-                );
+                ctx.drawImage(sprite, colFrame * frameW, row * frameH, frameW, frameH, 0, 0, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8);
             } else {
-                ctx.drawImage(
-                    sprite,
-                    colFrame * frameW, row * frameH, frameW, frameH,
-                    drawX, drawY,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8
-                );
+                ctx.drawImage(sprite, colFrame * frameW, row * frameH, frameW, frameH, drawX, drawY, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8);
             }
             ctx.restore();
 
         } else if (sprite) {
-            // Sprites de 4 colunas × 4 linhas (hero, naruto, sasuke)
             const frameW = sprite.width / 4;
             const frameH = sprite.height / 4;
             let row = 0;
@@ -418,54 +523,39 @@ class Player extends Entity {
                 return;
             }
 
-            if (this.direction === 'down') {
-                row = 0;
-                flipH = false;
-            } else if (this.direction === 'up') {
-                row = 1;
-                flipH = false;
-            } else if (this.direction === 'right') {
-                row = 2;
-                flipH = false;
-            } else if (this.direction === 'left') {
-                row = 2;
-                flipH = true;
-            }
+            if (this.direction === 'down') { row = 0; flipH = false; }
+            else if (this.direction === 'up') { row = 1; flipH = false; }
+            else if (this.direction === 'right') { row = 2; flipH = false; }
+            else if (this.direction === 'left') { row = 2; flipH = true; }
 
             const drawX = this.x - (CONSTANTS.TILE_SIZE - this.width)/2;
             const drawY = this.y - (CONSTANTS.TILE_SIZE - this.height)/2 - 6;
 
             ctx.save();
+            // Diferenciação visual para Player 2 (aura ciano neon)
+            if (this.playerIndex === 2) {
+                ctx.shadowColor = '#00e5ff';
+                ctx.shadowBlur = 10;
+            }
+
             if (flipH) {
                 ctx.translate(drawX + CONSTANTS.TILE_SIZE, drawY);
                 ctx.scale(-1, 1);
-                ctx.drawImage(
-                    sprite,
-                    this.animFrame * frameW, row * frameH, frameW, frameH,
-                    0, 0,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 6
-                );
+                ctx.drawImage(sprite, this.animFrame * frameW, row * frameH, frameW, frameH, 0, 0, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 6);
             } else {
-                ctx.drawImage(
-                    sprite,
-                    this.animFrame * frameW, row * frameH, frameW, frameH,
-                    drawX, drawY,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 6
-                );
+                ctx.drawImage(sprite, this.animFrame * frameW, row * frameH, frameW, frameH, drawX, drawY, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 6);
             }
             ctx.restore();
         } else if (this.character === 'hero_sasuke') {
-            // Renderização Procedural Rica do Sasuke Uchiha
             this.drawProceduralSasuke(ctx);
         } else {
-            // Fallback genérico
             if (this.isAlive) {
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, this.y, this.width, this.height);
             }
         }
 
-        // Desenha Escudo Ativo ao redor do jogador
+        // Desenha Escudo Ativo
         if (this.isAlive && this.hasShield) {
             ctx.save();
             const centerX = this.x + this.width / 2;
@@ -478,12 +568,7 @@ class Player extends Entity {
                 const sSize = CONSTANTS.TILE_SIZE * 1.1 * shieldPulse;
                 
                 ctx.globalAlpha = 0.8;
-                ctx.drawImage(
-                    doorAndKeySprite,
-                    1 * kw, 1 * kh, kw, kh,
-                    centerX - sSize / 2, centerY - sSize / 2,
-                    sSize, sSize
-                );
+                ctx.drawImage(doorAndKeySprite, 1 * kw, 1 * kh, kw, kh, centerX - sSize / 2, centerY - sSize / 2, sSize, sSize);
             } else {
                 ctx.strokeStyle = '#29b6f6';
                 ctx.lineWidth = 3;
@@ -494,68 +579,33 @@ class Player extends Entity {
             ctx.restore();
         }
 
-        // Efeito de aura de Chakra durante o disparo de Rasengan / Chidori
-        if (this.isAlive && this.castTimer > 0) {
+        // Efeito de Maldição da Caveira (Ícone flutuante roxo acima do herói)
+        if (this.isAlive && this.curseTimer > 0) {
             ctx.save();
-            const cx = this.x + this.width / 2;
-            const cy = this.y + this.height / 2;
-            
-            if (this.character === 'hero_sasuke') {
-                // Descarga elétrica e faíscas azuis do Chidori
-                ctx.shadowColor = '#00f0ff';
-                ctx.shadowBlur = 24;
-                ctx.strokeStyle = 'rgba(0, 240, 255, 0.95)';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(cx, cy, this.width * (0.8 + Math.random() * 0.35), 0, Math.PI * 2);
-                ctx.stroke();
+            const floatY = Math.sin(Date.now() / 120) * 3;
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ab47bc';
+            ctx.shadowBlur = 12;
+            ctx.fillText('💀', this.x + this.width / 2, this.y - 12 + floatY);
+            ctx.restore();
+        }
 
-                // Fagulhas elétricas
-                ctx.fillStyle = '#ffffff';
-                for (let i = 0; i < 4; i++) {
-                    const ang = Math.random() * Math.PI * 2;
-                    const r = this.width * (0.6 + Math.random() * 0.4);
-                    ctx.fillRect(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, 3, 3);
-                }
-            } else if (this.character === 'hero_warrior') {
-                // Explosão de energia dourada do Guerreiro
-                ctx.shadowColor = '#ffd700';
-                ctx.shadowBlur = 30;
-                ctx.strokeStyle = 'rgba(255, 200, 20, 0.95)';
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.arc(cx, cy, this.width * (0.9 + Math.random() * 0.4), 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Faíscas douradas radiando para fora
-                for (let i = 0; i < 6; i++) {
-                    const ang = (i / 6) * Math.PI * 2 + Date.now() * 0.01;
-                    const r1 = this.width * 0.9;
-                    const r2 = this.width * (1.2 + Math.random() * 0.5);
-                    ctx.strokeStyle = `rgba(255, ${180 + Math.random() * 70 | 0}, 0, 0.8)`;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
-                    ctx.lineTo(cx + Math.cos(ang) * r2, cy + Math.sin(ang) * r2);
-                    ctx.stroke();
-                }
-            } else {
-                // Vórtice espiral do Rasengan
-                ctx.shadowColor = '#00e5ff';
-                ctx.shadowBlur = 22;
-                ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(cx, cy, this.width * (0.75 + Math.random() * 0.3), 0, Math.PI * 2);
-                ctx.stroke();
-            }
+        // Indicador de P1 ou P2 acima do personagem no modo versus
+        if (this.isAlive) {
+            ctx.save();
+            ctx.font = 'bold 9px "Outfit", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = (this.playerIndex === 1) ? '#ff5722' : '#00e5ff';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 4;
+            ctx.fillText(`P${this.playerIndex}`, this.x + this.width / 2, this.y - 2);
             ctx.restore();
         }
 
         ctx.globalAlpha = 1.0;
     }
 
-    // Desenho vetorial estilizado em Pixel-Art / Chibi do Sasuke Uchiha
     drawProceduralSasuke(ctx) {
         if (!this.isAlive) {
             ctx.save();
@@ -573,46 +623,32 @@ class Player extends Entity {
 
         ctx.save();
         ctx.translate(cx, cy);
+        if (this.direction === 'left') ctx.scale(-1, 1);
 
-        if (this.direction === 'left') {
-            ctx.scale(-1, 1);
-        }
-
-        // Sombra nos pés
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
         ctx.beginPath();
         ctx.ellipse(0, this.height * 0.45, this.width * 0.4, this.height * 0.15, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Pernas / Calças escuras
         ctx.fillStyle = '#1e1e24';
         ctx.fillRect(-this.width * 0.28, this.height * 0.15 + walkOffset, this.width * 0.22, this.height * 0.3);
         ctx.fillRect(this.width * 0.06, this.height * 0.15 - walkOffset, this.width * 0.22, this.height * 0.3);
 
-        // Faixas brancas nas pernas
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-this.width * 0.28, this.height * 0.32 + walkOffset, this.width * 0.22, 2.5);
-        ctx.fillRect(this.width * 0.06, this.height * 0.32 - walkOffset, this.width * 0.22, 2.5);
-
-        // Túnica Azul Escura (Roupa Clássica do Sasuke)
         ctx.fillStyle = '#1a237e';
         ctx.beginPath();
         ctx.roundRect(-this.width * 0.38, -this.height * 0.15, this.width * 0.76, this.height * 0.4, 4);
         ctx.fill();
 
-        // Gola Alta Branca/Azul
         ctx.fillStyle = '#283593';
         ctx.fillRect(-this.width * 0.25, -this.height * 0.28, this.width * 0.5, this.height * 0.16);
 
-        // Cabeça (Pele)
         ctx.fillStyle = '#ffe0bd';
         ctx.beginPath();
         ctx.arc(0, -this.height * 0.22, this.width * 0.28, 0, Math.PI * 2);
         ctx.fill();
 
-        // Olhos do Sasuke (Preto ou Sharingan Vermelho durante o Chidori!)
         if (this.castTimer > 0) {
-            ctx.fillStyle = '#ff1744'; // Sharingan
+            ctx.fillStyle = '#ff1744';
             ctx.shadowColor = '#ff1744';
             ctx.shadowBlur = 6;
         } else {
@@ -623,19 +659,15 @@ class Player extends Entity {
         if (this.direction !== 'up') {
             ctx.fillRect(-this.width * 0.16, -this.height * 0.26, 3, 4);
             ctx.fillRect(this.width * 0.08, -this.height * 0.26, 3, 4);
-            ctx.shadowBlur = 0;
         }
 
-        // Protetor de Testa / Bandana Ninja
         ctx.fillStyle = '#0d47a1';
         ctx.fillRect(-this.width * 0.3, -this.height * 0.42, this.width * 0.6, 6);
         ctx.fillStyle = '#e0e0e0';
         ctx.fillRect(-this.width * 0.14, -this.height * 0.42, this.width * 0.28, 5);
 
-        // Cabelo Espetado Preto do Sasuke com Franjas laterais
         ctx.fillStyle = '#111318';
         ctx.beginPath();
-        // Topo e Espetos Traseiros
         ctx.moveTo(-this.width * 0.35, -this.height * 0.35);
         ctx.lineTo(-this.width * 0.48, -this.height * 0.55);
         ctx.lineTo(-this.width * 0.25, -this.height * 0.52);
@@ -643,19 +675,6 @@ class Player extends Entity {
         ctx.lineTo(this.width * 0.25, -this.height * 0.52);
         ctx.lineTo(this.width * 0.48, -this.height * 0.55);
         ctx.lineTo(this.width * 0.35, -this.height * 0.35);
-        ctx.fill();
-
-        // Franjas laterais longas
-        ctx.beginPath();
-        ctx.moveTo(-this.width * 0.28, -this.height * 0.35);
-        ctx.lineTo(-this.width * 0.32, -this.height * 0.1);
-        ctx.lineTo(-this.width * 0.2, -this.height * 0.25);
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.moveTo(this.width * 0.28, -this.height * 0.35);
-        ctx.lineTo(this.width * 0.32, -this.height * 0.1);
-        ctx.lineTo(this.width * 0.2, -this.height * 0.25);
         ctx.fill();
 
         ctx.restore();
