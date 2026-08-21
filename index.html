@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bomberman Deluxe - Ultimate Arcade & Battle Edition</title>
+    <title>Bomberman Deluxe - Ultimate Story & Battle Edition</title>
     <!-- Google Fonts para tipografia arcade moderna e impactante -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -66,6 +66,28 @@
         <!-- Canvas do Jogo -->
         <canvas id="gameCanvas" width="720" height="720"></canvas>
 
+        <!-- CAIXA DE DIÁLOGO VISUAL NOVEL / MODO HISTÓRIA -->
+        <div id="dialogue-overlay" class="dialogue-overlay hidden">
+            <div class="dialogue-box">
+                <div class="dialogue-avatar-container">
+                    <img id="dialogue-avatar-img" src="assets/portrait_sensei.jpg" alt="Personagem" class="dialogue-avatar-img">
+                    <div class="dialogue-avatar-glow"></div>
+                </div>
+                <div class="dialogue-content">
+                    <div class="dialogue-speaker-badge">
+                        <span id="dialogue-speaker-name">Mestre Ancião</span>
+                    </div>
+                    <div class="dialogue-text-body">
+                        <p id="dialogue-text">Carregando diálogo...</p>
+                    </div>
+                    <div class="dialogue-actions-row">
+                        <button id="dialogue-skip-btn" class="dialogue-btn dialogue-btn-skip" title="Pular História [ESC]">⏭️ Pular [ESC]</button>
+                        <button id="dialogue-next-btn" class="dialogue-btn dialogue-btn-next">▶️ Continuar [ESPAÇO]</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- MENU INICIAL COMPLETO E ESTILIZADO -->
         <div id="start-menu-screen" class="menu-overlay">
             <div class="menu-backdrop"></div>
@@ -75,9 +97,9 @@
                     <img src="assets/menu_bg.jpg" alt="Bomberman" class="menu-cover-img" id="menu-cover-art">
                     <div class="menu-banner-gradient"></div>
                     <div class="title-container">
-                        <span class="arcade-tag">ULTIMATE ARCADE & BATTLE</span>
+                        <span class="arcade-tag">ULTIMATE STORY & BATTLE</span>
                         <h1 class="game-logo-title">BOMBERMAN</h1>
-                        <p class="game-tagline">EXPLODA OBSTÁCULOS • DERROTE INIMIGOS • DUELO PVP 1v1</p>
+                        <p class="game-tagline">MODO HISTÓRIA COM DIÁLOGOS • SOBREVIVÊNCIA • DUELO PVP 1v1</p>
                     </div>
                 </div>
 
@@ -86,7 +108,7 @@
                     <div class="high-scores-row">
                         <div class="high-score-banner">
                             <span class="trophy-icon">🏆</span>
-                            <span class="trophy-text">CAMPANHA: <strong id="menu-high-score">0</strong> PTS</span>
+                            <span class="trophy-text">HISTÓRIA: <strong id="menu-high-score">0</strong> PTS</span>
                         </div>
                         <div class="high-score-banner endless-record-banner">
                             <span class="trophy-icon">🌊</span>
@@ -99,10 +121,10 @@
                         <span class="select-hero-title">🕹️ ESCOLHA O MODO DE JOGO:</span>
                         <div class="mode-cards-grid">
                             <div class="mode-card active" data-mode="campaign">
-                                <span class="mode-icon">👑</span>
+                                <span class="mode-icon">📜</span>
                                 <div class="mode-info">
-                                    <strong class="mode-title">CAMPANHA</strong>
-                                    <span class="mode-desc">3 Fases + Boss Final</span>
+                                    <strong class="mode-title">MODO HISTÓRIA</strong>
+                                    <span class="mode-desc">5 Capítulos + Diálogos</span>
                                 </div>
                             </div>
                             <div class="mode-card" data-mode="endless">
@@ -222,7 +244,7 @@
                     <div class="menu-actions">
                         <button id="btn-start-game" class="menu-btn btn-primary">
                             <span class="btn-icon">💣</span>
-                            <span class="btn-text">INICIAR JOGO</span>
+                            <span class="btn-text">INICIAR HISTÓRIA</span>
                             <span class="btn-shortcut">[ENTER]</span>
                         </button>
                         <div class="menu-sub-actions">
@@ -278,7 +300,7 @@
                             </div>
                             <div class="key-item">
                                 <div class="key-caps"><kbd>ESPAÇO</kbd></div>
-                                <span>Plantar Bomba</span>
+                                <span>Plantar Bomba / Avançar Diálogos</span>
                             </div>
                             <div class="key-item">
                                 <div class="key-caps"><kbd>Z</kbd></div>
@@ -454,6 +476,7 @@
     <script src="js/SoundManager.js"></script>
     <script src="js/ParticleSystem.js"></script>
     <script src="js/SpriteLoader.js"></script>
+    <script src="js/DialogueSystem.js"></script>
     <script src="js/Entity.js"></script>
     <script src="js/Bomb.js"></script>
     <script src="js/Rasengan.js"></script>

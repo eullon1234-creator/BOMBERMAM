@@ -29,12 +29,25 @@ const CONSTANTS = {
     STATE_LEVEL_CLEAR: 3,
     STATE_VICTORY: 4,
     STATE_PAUSED: 5,
+    STATE_CUTSCENE: 6,
 
     // Modos de Jogo
     GAME_MODES: {
-        CAMPAIGN: 'campaign',   // 3 Fases com História e Boss
+        CAMPAIGN: 'campaign',   // 5 Fases do Modo História
         ENDLESS: 'endless',     // Hordas infinitas com ondas crescentes
         PVP: 'pvp'              // 2 Jogadores local no mesmo teclado
+    },
+
+    // Total de Fases da Campanha
+    MAX_CAMPAIGN_LEVELS: 5,
+
+    // Biomas dos Capítulos da História
+    BIOMES: {
+        FOREST: 0,   // Capítulo 1: Floresta Ancestral
+        CRYSTAL: 1,  // Capítulo 2: Caverna de Cristais
+        VOLCANO: 2,  // Capítulo 3: Forja Vulcânica
+        CYBER: 3,    // Capítulo 4: Laboratório Cibernético
+        THRONE: 4    // Capítulo 5: O Trono do Titã Mecânico
     },
 
     // Tipos de Inimigos
@@ -61,9 +74,9 @@ const CONSTANTS = {
 
     // Efeitos da Maldição da Caveira (Skull Curse)
     CURSE_TYPES: {
-        DIARRHEA: 'diarrhea',       // Planta bombas incontrolavelmente
-        INVERTED: 'inverted',       // Controles invertidos
-        SLOW: 'slow',               // Lentidão extrema
-        FAST: 'fast'                // Hipervelocidade descontrolada
+        DIARRHEA: 'diarrhea',
+        INVERTED: 'inverted',
+        SLOW: 'slow',
+        FAST: 'fast'
     }
 };

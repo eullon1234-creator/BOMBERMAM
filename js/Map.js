@@ -4,7 +4,7 @@ class LevelMap {
         this.powerUps = []; // {col, row, type, immunityTimer}
         this.door = null;   // {col, row, isRevealed, isOpen}
         this.keyInCrate = null;
-        this.currentLevelBiome = 0;
+        this.currentLevelBiome = CONSTANTS.BIOMES.FOREST;
         
         // Mecânica de Sudden Death (PvP)
         this.suddenDeathIndex = 0;
@@ -51,7 +51,15 @@ class LevelMap {
         this.door = null;
         this.keyInCrate = null;
         this.rasenganCrates = [];
-        this.currentLevelBiome = Math.min(2, level - 1);
+        
+        // Define o bioma de acordo com a fase da campanha (1 a 5)
+        if (mode === 'campaign') {
+            this.currentLevelBiome = Math.min(4, Math.max(0, level - 1));
+        } else if (mode === 'endless') {
+            this.currentLevelBiome = (level % 4);
+        } else {
+            this.currentLevelBiome = 1; // PvP usa arena de cristais
+        }
 
         const softWallPositions = [];
 
@@ -65,8 +73,8 @@ class LevelMap {
                     continue;
                 }
 
-                // Modo Boss (Fase 3 Campanha)
-                if (mode === 'campaign' && level === 3) {
+                // Modo Boss Final (Fase 5 da Campanha)
+                if (mode === 'campaign' && level === CONSTANTS.MAX_CAMPAIGN_LEVELS) {
                     if ((row === 3 || row === 11) && (col === 3 || col === 11)) {
                         rowArray.push(CONSTANTS.TILE_SOLID);
                     } else {
@@ -79,23 +87,20 @@ class LevelMap {
                 if (row % 2 === 0 && col % 2 === 0) {
                     rowArray.push(CONSTANTS.TILE_SOLID);
                 } else {
-                    // Safe Zones
                     let isSafe = false;
 
                     if (mode === 'pvp') {
-                        // Safe zones para P1 (canto superior esquerdo) e P2 (canto inferior direito)
                         if ((row === 1 && col <= 2) || (col === 1 && row <= 2)) isSafe = true;
                         if ((row === CONSTANTS.GRID_HEIGHT - 2 && col >= CONSTANTS.GRID_WIDTH - 3) || 
                             (col === CONSTANTS.GRID_WIDTH - 2 && row >= CONSTANTS.GRID_HEIGHT - 3)) isSafe = true;
                     } else {
-                        // Safe zone P1 padrão (3x3 inicial)
                         if ((row === 1 && col <= 2) || (col === 1 && row <= 2)) isSafe = true;
                     }
 
                     if (isSafe) {
                         rowArray.push(CONSTANTS.TILE_EMPTY);
                     } else {
-                        const softChance = (mode === 'endless') ? 0.38 : (mode === 'pvp' ? 0.55 : 0.48);
+                        const softChance = (mode === 'endless') ? 0.38 : (mode === 'pvp' ? 0.55 : 0.46);
                         if (Math.random() < softChance) {
                             rowArray.push(CONSTANTS.TILE_SOFT);
                             softWallPositions.push({ col, row });
@@ -108,8 +113,8 @@ class LevelMap {
             this.grid.push(rowArray);
         }
 
-        // Posicionamento da Porta e Chave na Campanha
-        if (mode === 'campaign' && level < 3 && softWallPositions.length > 4) {
+        // Posicionamento da Porta e Chave nas Fases 1 a 4 da Campanha
+        if (mode === 'campaign' && level < CONSTANTS.MAX_CAMPAIGN_LEVELS && softWallPositions.length > 4) {
             softWallPositions.sort(() => Math.random() - 0.5);
 
             const doorPos = softWallPositions[0];
@@ -131,7 +136,7 @@ class LevelMap {
                 { col: softWallPositions[2].col, row: softWallPositions[2].row },
                 { col: softWallPositions[3].col, row: softWallPositions[3].row }
             ];
-        } else if (mode === 'campaign' && level === 3) {
+        } else if (mode === 'campaign' && level === CONSTANTS.MAX_CAMPAIGN_LEVELS) {
             this.spawnPowerUp(3, 7, 'rasengan');
             this.spawnPowerUp(11, 7, 'rasengan');
             this.spawnPowerUp(7, 3, 'shield');
@@ -141,7 +146,6 @@ class LevelMap {
         }
     }
 
-    // Cria a espiral de blocos para o Sudden Death no PvP
     buildSuddenDeathSpiral() {
         this.suddenDeathIndex = 0;
         this.suddenDeathOrder = [];
@@ -189,7 +193,8 @@ class LevelMap {
         const itemSprite = spriteLoader ? spriteLoader.get('items') : null;
         const doorAndKeySprite = spriteLoader ? spriteLoader.get('door_and_key') : null;
 
-        const tileRow = this.currentLevelBiome;
+        // Seletor de linha do sprite sheet (0, 1 ou 2) ou efeitos de cor por bioma
+        const spriteRow = Math.min(2, this.currentLevelBiome % 3);
 
         for (let row = 0; row < CONSTANTS.GRID_HEIGHT; row++) {
             for (let col = 0; col < CONSTANTS.GRID_WIDTH; col++) {
@@ -201,10 +206,20 @@ class LevelMap {
                     const tw = tileSprite.width / 3;
                     const th = tileSprite.height / 3;
 
+                    ctx.save();
+                    // Tonalidade de cor única para cada bioma da história
+                    if (this.currentLevelBiome === CONSTANTS.BIOMES.VOLCANO) {
+                        ctx.filter = 'hue-rotate(-40deg) saturate(1.4)'; // Tom avermelhado vulcânico
+                    } else if (this.currentLevelBiome === CONSTANTS.BIOMES.CYBER) {
+                        ctx.filter = 'hue-rotate(160deg) contrast(1.2)'; // Tom ciano cibernético
+                    } else if (this.currentLevelBiome === CONSTANTS.BIOMES.THRONE) {
+                        ctx.filter = 'hue-rotate(240deg) brightness(0.85) contrast(1.3)'; // Trono sombrio
+                    }
+
                     // Chão
                     ctx.drawImage(
                         tileSprite,
-                        2 * tw, tileRow * th, tw, th,
+                        2 * tw, spriteRow * th, tw, th,
                         x, y,
                         CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                     );
@@ -219,18 +234,19 @@ class LevelMap {
                     if (tile === CONSTANTS.TILE_SOLID) {
                         ctx.drawImage(
                             tileSprite,
-                            0 * tw, tileRow * th, tw, th,
+                            0 * tw, spriteRow * th, tw, th,
                             x, y,
                             CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                         );
                     } else if (tile === CONSTANTS.TILE_SOFT) {
                         ctx.drawImage(
                             tileSprite,
-                            1 * tw, tileRow * th, tw, th,
+                            1 * tw, spriteRow * th, tw, th,
                             x, y,
                             CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                         );
                     }
+                    ctx.restore();
                 } else {
                     if (tile === CONSTANTS.TILE_SOLID) {
                         ctx.fillStyle = CONSTANTS.COLORS.SOLID_WALL;
@@ -280,7 +296,6 @@ class LevelMap {
                     ctx.fill();
                 }
             } else if (p.type === 'remote') {
-                // Ícone Detonador Remoto
                 ctx.save();
                 ctx.shadowColor = '#e91e63';
                 ctx.shadowBlur = 12;
@@ -294,7 +309,6 @@ class LevelMap {
                 ctx.restore();
 
             } else if (p.type === 'skull') {
-                // Ícone Caveira da Maldição
                 ctx.save();
                 ctx.shadowColor = '#ab47bc';
                 ctx.shadowBlur = 14;
@@ -304,7 +318,6 @@ class LevelMap {
                 ctx.restore();
 
             } else if (p.type === 'ice') {
-                // Ícone Bomba de Gelo
                 ctx.save();
                 ctx.shadowColor = '#00e5ff';
                 ctx.shadowBlur = 14;

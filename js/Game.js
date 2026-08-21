@@ -79,7 +79,6 @@ class Game {
             }
         });
 
-        // Mostra ou esconde seletor de Player 2
         const p2Container = document.getElementById('p2-select-container');
         if (p2Container) {
             if (this.mode === CONSTANTS.GAME_MODES.PVP) {
@@ -139,14 +138,12 @@ class Game {
         window.addEventListener('keydown', (e) => this.handleKey(e, true));
         window.addEventListener('keyup', (e) => this.handleKey(e, false));
         
-        // Botão Iniciar Jogo
         const startBtn = document.getElementById('btn-start-game');
         if (startBtn) {
             startBtn.addEventListener('click', () => this.startGame());
             startBtn.addEventListener('mouseenter', () => window.soundManager?.playHover());
         }
 
-        // Seletor de Modos de Jogo
         document.querySelectorAll('.mode-card').forEach(card => {
             card.addEventListener('click', () => {
                 const m = card.getAttribute('data-mode');
@@ -155,7 +152,6 @@ class Game {
             card.addEventListener('mouseenter', () => window.soundManager?.playHover());
         });
 
-        // Modais de Ajuda e Guia
         const howToBtn = document.getElementById('btn-how-to-play');
         if (howToBtn) {
             howToBtn.addEventListener('click', () => {
@@ -192,14 +188,12 @@ class Game {
             });
         });
 
-        // Alternar Som
         const menuSoundBtn = document.getElementById('btn-sound-toggle');
         if (menuSoundBtn) menuSoundBtn.addEventListener('click', () => this.toggleSound());
 
         const inGameSoundBtn = document.getElementById('in-game-sound-btn');
         if (inGameSoundBtn) inGameSoundBtn.addEventListener('click', () => this.toggleSound());
 
-        // Seletor de Personagens P1
         document.querySelectorAll('.char-card-p1').forEach(card => {
             card.addEventListener('click', () => {
                 const char = card.getAttribute('data-char');
@@ -208,7 +202,6 @@ class Game {
             card.addEventListener('mouseenter', () => window.soundManager?.playHover());
         });
 
-        // Seletor de Personagens P2
         document.querySelectorAll('.char-card-p2').forEach(card => {
             card.addEventListener('click', () => {
                 const char = card.getAttribute('data-char');
@@ -217,11 +210,9 @@ class Game {
             card.addEventListener('mouseenter', () => window.soundManager?.playHover());
         });
 
-        // Botão de Pausa
         const inGamePauseBtn = document.getElementById('in-game-pause-btn');
         if (inGamePauseBtn) inGamePauseBtn.addEventListener('click', () => this.togglePause());
 
-        // Botões do Menu de Pausa
         const resumeBtn = document.getElementById('btn-resume-game');
         if (resumeBtn) resumeBtn.addEventListener('click', () => this.togglePause());
 
@@ -243,19 +234,17 @@ class Game {
             });
         }
 
-        // Botão de Retornar ao Menu
         const inGameMenuBtn = document.getElementById('in-game-menu-btn');
         if (inGameMenuBtn) inGameMenuBtn.addEventListener('click', () => this.returnToMenu());
 
         const returnMenuBtn = document.getElementById('btn-return-menu');
         if (returnMenuBtn) returnMenuBtn.addEventListener('click', () => this.returnToMenu());
 
-        // Botão de Reiniciar após Game Over
         const restartBtn = document.getElementById('restart-btn');
         if (restartBtn) {
             restartBtn.addEventListener('click', () => {
                 window.soundManager?.playSelect();
-                document.getElementById('game-over-screen').classList.add('hidden');
+                document.getElementById('game-over-screen')?.classList.add('hidden');
                 this.startGame();
             });
         }
@@ -272,7 +261,7 @@ class Game {
     }
 
     togglePause() {
-        if (this.state !== CONSTANTS.STATE_PLAYING) return;
+        if (this.state !== CONSTANTS.STATE_PLAYING && this.state !== CONSTANTS.STATE_CUTSCENE) return;
         this.isPaused = !this.isPaused;
         if (this.isPaused) {
             window.soundManager?.playPause();
@@ -296,7 +285,7 @@ class Game {
         const inGameSoundBtn = document.getElementById('in-game-sound-btn');
 
         if (soundIcon) soundIcon.innerText = isEnabled ? '🔊' : '🔇';
-        if (soundLabel) soundLabel.innerText = isEnabled ? 'SOM: LIGADO' : 'SOM: MUDO';
+        if (soundLabel) soundLabel.innerText = isEnabled ? 'SOM: ON' : 'SOM: OFF';
         if (inGameSoundBtn) inGameSoundBtn.innerText = isEnabled ? '🔊' : '🔇';
     }
 
@@ -329,14 +318,6 @@ class Game {
         document.getElementById('ui-layer')?.classList.remove('hidden');
         
         this.initLevel(this.level);
-        this.state = CONSTANTS.STATE_PLAYING;
-
-        // Inicia BGM apropriada
-        if (this.mode === CONSTANTS.GAME_MODES.PVP) {
-            window.soundManager?.startBGM('pvp');
-        } else {
-            window.soundManager?.startBGM('stage');
-        }
     }
 
     returnToMenu() {
@@ -346,6 +327,7 @@ class Game {
         this.state = CONSTANTS.STATE_MENU;
         this.isPaused = false;
         
+        document.getElementById('dialogue-overlay')?.classList.add('hidden');
         document.getElementById('start-menu-screen')?.classList.remove('hidden');
         document.getElementById('game-over-screen')?.classList.add('hidden');
         document.getElementById('modal-pause')?.classList.add('hidden');
@@ -355,6 +337,20 @@ class Game {
     }
 
     handleKey(e, isDown) {
+        // Se houver diálogo ativo, teclas Espaço/Enter avançam e ESC pula
+        const dialogueOverlay = document.getElementById('dialogue-overlay');
+        const isDialogueOpen = dialogueOverlay && !dialogueOverlay.classList.contains('hidden');
+
+        if (isDialogueOpen && isDown) {
+            if (e.key === ' ' || e.key === 'Enter') {
+                window.dialogueSystem?.advance();
+                return;
+            } else if (e.key === 'Escape') {
+                window.dialogueSystem?.skip();
+                return;
+            }
+        }
+
         if (this.state === CONSTANTS.STATE_MENU && isDown) {
             if (e.key === 'Enter' || e.key === ' ') {
                 const anyModalOpen = !document.getElementById('modal-how-to-play')?.classList.contains('hidden') ||
@@ -371,13 +367,15 @@ class Game {
                 if (this.state === CONSTANTS.STATE_PLAYING) {
                     this.togglePause();
                     return;
-                } else {
+                } else if (this.state === CONSTANTS.STATE_MENU) {
                     this.closeModal('modal-how-to-play');
                     this.closeModal('modal-guide');
                 }
             }
             return;
         }
+
+        if (this.state === CONSTANTS.STATE_CUTSCENE) return;
 
         // Controles Jogador 1 (WASD + Espaço + Z + X)
         if (this.player) {
@@ -390,7 +388,6 @@ class Game {
                 case 'space': this.player.keys.action = isDown; break;
                 case 'z': this.player.keys.special = isDown; break;
                 case 'x': this.player.keys.remote = isDown; break;
-                // No modo 1 Jogador, as setas também controlam o P1
                 case 'arrowup': if (this.mode !== CONSTANTS.GAME_MODES.PVP) this.player.keys.up = isDown; break;
                 case 'arrowdown': if (this.mode !== CONSTANTS.GAME_MODES.PVP) this.player.keys.down = isDown; break;
                 case 'arrowleft': if (this.mode !== CONSTANTS.GAME_MODES.PVP) this.player.keys.left = isDown; break;
@@ -418,7 +415,6 @@ class Game {
         this.particleSystem.clear();
         this.map.generate(this.mode, levelNum);
         
-        // P1 nasce no canto superior esquerdo
         this.player = new Player(CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE, this.selectedCharacter, 1);
         
         if (this.playerStats && this.mode !== CONSTANTS.GAME_MODES.PVP) {
@@ -429,7 +425,6 @@ class Game {
             this.player.rasenganAmmo = this.playerStats.rasenganAmmo || 0;
         }
         
-        // P2 no modo PvP nasce no canto inferior direito
         if (this.mode === CONSTANTS.GAME_MODES.PVP) {
             const p2X = (CONSTANTS.GRID_WIDTH - 2) * CONSTANTS.TILE_SIZE;
             const p2Y = (CONSTANTS.GRID_HEIGHT - 2) * CONSTANTS.TILE_SIZE;
@@ -448,17 +443,25 @@ class Game {
         
         if (this.mode === CONSTANTS.GAME_MODES.CAMPAIGN) {
             if (levelNum === 1) {
+                // Capítulo 1: Floresta
                 this.spawnEnemyList([CONSTANTS.ENEMY_TYPES.BALLOM, CONSTANTS.ENEMY_TYPES.BALLOM, CONSTANTS.ENEMY_TYPES.ONEAL]);
             } else if (levelNum === 2) {
-                this.spawnEnemyList([CONSTANTS.ENEMY_TYPES.BALLOM, CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.DAHL, CONSTANTS.ENEMY_TYPES.MINVO]);
+                // Capítulo 2: Caverna de Cristais
+                this.spawnEnemyList([CONSTANTS.ENEMY_TYPES.BALLOM, CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.DAHL]);
             } else if (levelNum === 3) {
+                // Capítulo 3: Forja Vulcânica
+                this.spawnEnemyList([CONSTANTS.ENEMY_TYPES.BALLOM, CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.DAHL, CONSTANTS.ENEMY_TYPES.DAHL, CONSTANTS.ENEMY_TYPES.MINVO]);
+            } else if (levelNum === 4) {
+                // Capítulo 4: Laboratório Cibernético
+                this.spawnEnemyList([CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.ONEAL, CONSTANTS.ENEMY_TYPES.DAHL, CONSTANTS.ENEMY_TYPES.MINVO, CONSTANTS.ENEMY_TYPES.MINVO]);
+            } else if (levelNum === 5) {
+                // Capítulo 5: O Trono do Titã Mecânico (Boss Final)
                 const centerX = Math.floor(CONSTANTS.GRID_WIDTH / 2) * CONSTANTS.TILE_SIZE;
                 const centerY = Math.floor(CONSTANTS.GRID_HEIGHT / 2) * CONSTANTS.TILE_SIZE;
                 this.boss = new Boss(centerX, centerY);
-                window.soundManager?.startBGM('boss');
             }
 
-            if (levelNum < 3 && !this.map.keyInCrate && this.enemies.length > 0) {
+            if (levelNum < CONSTANTS.MAX_CAMPAIGN_LEVELS && !this.map.keyInCrate && this.enemies.length > 0) {
                 const chosenEnemy = this.enemies[Math.floor(Math.random() * this.enemies.length)];
                 chosenEnemy.hasKey = true;
             }
@@ -467,6 +470,26 @@ class Game {
         }
         
         this.updateUI();
+
+        // Inicia Diálogo Narrativo se for Modo História
+        if (this.mode === CONSTANTS.GAME_MODES.CAMPAIGN) {
+            const dialogueKey = `ch${levelNum}_${levelNum === 5 ? 'boss_intro' : 'intro'}`;
+            this.state = CONSTANTS.STATE_CUTSCENE;
+            window.dialogueSystem?.startDialogue(dialogueKey, this.selectedCharacter, () => {
+                this.state = CONSTANTS.STATE_PLAYING;
+                if (levelNum === 5) {
+                    window.soundManager?.startBGM('boss');
+                } else {
+                    window.soundManager?.startBGM('stage');
+                }
+            });
+        } else if (this.mode === CONSTANTS.GAME_MODES.PVP) {
+            this.state = CONSTANTS.STATE_PLAYING;
+            window.soundManager?.startBGM('pvp');
+        } else {
+            this.state = CONSTANTS.STATE_PLAYING;
+            window.soundManager?.startBGM('stage');
+        }
     }
 
     spawnEndlessWave(waveNum) {
@@ -551,7 +574,8 @@ class Game {
                 const secs = Math.max(0, Math.ceil(this.pvpMatchTimer / 1000));
                 levelEl.innerText = this.suddenDeathStarted ? "🔥 SUDDEN DEATH!" : `⏱️ ${secs}s`;
             } else {
-                levelEl.innerText = `Fase: ${this.level}${this.level === 3 ? ' (BOSS)' : ''}`;
+                const chapterNames = ['Floresta', 'Cristais', 'Vulcão', 'Cyber Lab', 'BOSS TITÃ'];
+                levelEl.innerText = `Capítulo ${this.level}: ${chapterNames[this.level - 1] || ''}`;
             }
         }
 
@@ -591,8 +615,8 @@ class Game {
                 keyEl.innerText = `🌊 Monstros: ${this.enemies.filter(e => e.isAlive).length}`;
             } else if (this.mode === CONSTANTS.GAME_MODES.PVP) {
                 keyEl.innerText = "⚔️ Batalha 1v1";
-            } else if (this.level === 3) {
-                keyEl.innerText = "👑 Derrote o Chefe!";
+            } else if (this.level === CONSTANTS.MAX_CAMPAIGN_LEVELS) {
+                keyEl.innerText = "👑 Derrote o Titã!";
                 keyEl.classList.remove("key-found");
             } else if (this.player && this.player.hasKey) {
                 keyEl.innerText = "🔑 Chave: ✅ PORTAL ABERTO!";
@@ -689,7 +713,6 @@ class Game {
             const isInvulnerable = p.hasShield || p.spawnShieldTimer > 0;
             if (isInvulnerable) return;
 
-            // Player vs Inimigos
             for (let enemy of this.enemies) {
                 if (enemy.isAlive && p.checkCollision(enemy)) {
                     this.killPlayer(p);
@@ -697,7 +720,6 @@ class Game {
                 }
             }
 
-            // Player vs Boss
             if (this.boss && this.boss.isAlive && p.checkCollision(this.boss)) {
                 this.killPlayer(p);
                 return;
@@ -720,7 +742,6 @@ class Game {
                         height: CONSTANTS.TILE_SIZE
                     };
 
-                    // Destrói power-ups atingidos
                     for (let pIdx = this.map.powerUps.length - 1; pIdx >= 0; pIdx--) {
                         const p = this.map.powerUps[pIdx];
                         if (p.col === blast.col && p.row === blast.row) {
@@ -730,7 +751,6 @@ class Game {
                         }
                     }
 
-                    // Dano em P1 e P2
                     const damagePlayer = (p) => {
                         if (!p || !p.isAlive) return;
                         if (p.hasShield || p.spawnShieldTimer > 0) return;
@@ -744,7 +764,6 @@ class Game {
                         damagePlayer(this.player2);
                     }
 
-                    // Dano em Inimigos (e congelamento se for bomba de gelo)
                     for (let enemy of this.enemies) {
                         if (enemy.isAlive && enemy.checkCollision(blastHitbox)) {
                             if (bomb.isIce) {
@@ -764,7 +783,6 @@ class Game {
                         }
                     }
                     
-                    // Dano no Boss
                     if (this.boss && this.boss.isAlive && this.boss.checkCollision(blastHitbox)) {
                         if (this.boss.state !== 'damage') {
                             this.boss.takeDamage(1);
@@ -773,7 +791,7 @@ class Game {
                             this.updateUI();
                             
                             if (!this.boss.isAlive) {
-                                this.score += 3500;
+                                this.score += 5000;
                                 this.updateUI();
                             }
                         }
@@ -791,7 +809,6 @@ class Game {
         this.particleSystem.createExplosionSparks(deadPlayer.x + deadPlayer.width/2, deadPlayer.y + deadPlayer.height/2, '#ff1744', 25);
 
         if (this.mode === CONSTANTS.GAME_MODES.PVP) {
-            // No modo PvP, o outro jogador ganha o round
             const winnerIdx = deadPlayer.playerIndex === 1 ? 2 : 1;
             if (winnerIdx === 1) this.p1Wins++;
             else this.p2Wins++;
@@ -805,7 +822,6 @@ class Game {
             return;
         }
 
-        // Modo Campanha e Sobrevivência
         this.lives--;
         this.updateUI();
         
@@ -838,7 +854,7 @@ class Game {
 
     checkLevelClear() {
         if (this.mode === CONSTANTS.GAME_MODES.CAMPAIGN) {
-            if (this.level < 3) {
+            if (this.level < CONSTANTS.MAX_CAMPAIGN_LEVELS) {
                 if (this.map.door && (this.map.door.isRevealed || this.map.grid[this.map.door.row][this.map.door.col] === CONSTANTS.TILE_EMPTY)) {
                     const playerGrid = this.player.getGridPos();
                     if (playerGrid.col === this.map.door.col && playerGrid.row === this.map.door.row) {
@@ -846,30 +862,33 @@ class Game {
                             window.soundManager?.playVictory();
                             this.score += 500;
                             this.level++;
-                            this.particleSystem.addFloatingText(CONSTANTS.CANVAS_WIDTH/2, CONSTANTS.CANVAS_HEIGHT/2, "STAGE CLEAR!", "#00e676", 24, true);
+                            this.particleSystem.addFloatingText(CONSTANTS.CANVAS_WIDTH/2, CONSTANTS.CANVAS_HEIGHT/2, `CAPÍTULO ${this.level}!`, "#00e676", 24, true);
                             setTimeout(() => this.initLevel(this.level), 800);
                         }
                     }
                 }
-            } else if (this.level === 3) {
+            } else if (this.level === CONSTANTS.MAX_CAMPAIGN_LEVELS) {
                 if (this.boss && !this.boss.isAlive && this.boss.deathTimer > 1500) {
                     this.saveHighScore();
                     window.soundManager?.playVictory();
-                    this.state = CONSTANTS.STATE_VICTORY;
                     
-                    const titleEl = document.getElementById('game-over-title');
-                    const scoreValEl = document.getElementById('final-score-val');
-                    
-                    if (titleEl) {
-                        titleEl.innerText = "👑 VITÓRIA TOTAL!";
-                        titleEl.style.color = "#4CAF50";
-                    }
-                    if (scoreValEl) scoreValEl.innerText = this.score;
-                    document.getElementById('game-over-screen')?.classList.remove('hidden');
+                    // Dispara Epílogo da História
+                    this.state = CONSTANTS.STATE_CUTSCENE;
+                    window.dialogueSystem?.startDialogue('victory_epilogue', this.selectedCharacter, () => {
+                        this.state = CONSTANTS.STATE_VICTORY;
+                        const titleEl = document.getElementById('game-over-title');
+                        const scoreValEl = document.getElementById('final-score-val');
+                        
+                        if (titleEl) {
+                            titleEl.innerText = "👑 VITÓRIA TOTAL!";
+                            titleEl.style.color = "#4CAF50";
+                        }
+                        if (scoreValEl) scoreValEl.innerText = this.score;
+                        document.getElementById('game-over-screen')?.classList.remove('hidden');
+                    });
                 }
             }
         } else if (this.mode === CONSTANTS.GAME_MODES.ENDLESS) {
-            // Sobrevivência: se todos os monstros da onda morrerem, avança para a próxima onda
             if (this.enemies.length > 0 && this.enemies.every(e => !e.isAlive)) {
                 window.soundManager?.playVictory();
                 this.wave++;
@@ -885,7 +904,7 @@ class Game {
         const dt = Math.min(timestamp - this.lastTime, 50);
         this.lastTime = timestamp;
 
-        if (this.state === CONSTANTS.STATE_PLAYING && this.isLoaded && !this.isPaused) {
+        if ((this.state === CONSTANTS.STATE_PLAYING || this.state === CONSTANTS.STATE_CUTSCENE) && this.isLoaded && !this.isPaused) {
             this.update(dt);
             this.draw();
         }
@@ -897,7 +916,6 @@ class Game {
         this.map.update(dt);
         this.particleSystem.update(dt);
 
-        // Atualiza Sudden Death no modo PvP
         if (this.mode === CONSTANTS.GAME_MODES.PVP) {
             if (this.pvpMatchTimer > 0) {
                 this.pvpMatchTimer -= dt;
@@ -915,67 +933,63 @@ class Game {
             }
         }
 
-        if (this.player) {
-            this.player.update(dt, this.map, this.bombs, this);
-            this.checkPowerUpCollection(this.player);
-        }
-
-        if (this.player2 && this.mode === CONSTANTS.GAME_MODES.PVP) {
-            this.player2.update(dt, this.map, this.bombs, this);
-            this.checkPowerUpCollection(this.player2);
-        }
-
-        // Atualiza Projéteis do Rasengan
-        for (let i = this.rasengans.length - 1; i >= 0; i--) {
-            this.rasengans[i].update(dt, this.map, this.enemies, this.boss, this);
-            if (this.rasengans[i].toBeRemoved) this.rasengans.splice(i, 1);
-        }
-
-        // Atualiza Projéteis do Chidori
-        if (this.chidoris) {
-            for (let i = this.chidoris.length - 1; i >= 0; i--) {
-                this.chidoris[i].update(dt, this.map, this.enemies, this.boss, this);
-                if (this.chidoris[i].toBeRemoved) this.chidoris.splice(i, 1);
+        if (this.state !== CONSTANTS.STATE_CUTSCENE) {
+            if (this.player) {
+                this.player.update(dt, this.map, this.bombs, this);
+                this.checkPowerUpCollection(this.player);
             }
-        }
 
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            this.enemies[i].update(dt, this.map, this.player, this.bombs);
-            if (this.enemies[i].toBeRemoved) this.enemies.splice(i, 1);
-        }
-        
-        if (this.boss) {
-            this.boss.update(dt, this.map, this.player, this.bombs, this.enemies, this.particleSystem);
-        }
+            if (this.player2 && this.mode === CONSTANTS.GAME_MODES.PVP) {
+                this.player2.update(dt, this.map, this.bombs, this);
+                this.checkPowerUpCollection(this.player2);
+            }
 
-        for (let i = this.bombs.length - 1; i >= 0; i--) {
-            this.bombs[i].update(dt, this.map, this.bombs, this.enemies, this.boss, this.particleSystem);
-            if (this.bombs[i].toBeRemoved) this.bombs.splice(i, 1);
-        }
+            for (let i = this.rasengans.length - 1; i >= 0; i--) {
+                this.rasengans[i].update(dt, this.map, this.enemies, this.boss, this);
+                if (this.rasengans[i].toBeRemoved) this.rasengans.splice(i, 1);
+            }
 
-        this.checkCollisions();
-        this.updateUI();
-        
-        if (this.player && this.player.isAlive) {
-            this.checkLevelClear();
+            if (this.chidoris) {
+                for (let i = this.chidoris.length - 1; i >= 0; i--) {
+                    this.chidoris[i].update(dt, this.map, this.enemies, this.boss, this);
+                    if (this.chidoris[i].toBeRemoved) this.chidoris.splice(i, 1);
+                }
+            }
+
+            for (let i = this.enemies.length - 1; i >= 0; i--) {
+                this.enemies[i].update(dt, this.map, this.player, this.bombs);
+                if (this.enemies[i].toBeRemoved) this.enemies.splice(i, 1);
+            }
+            
+            if (this.boss) {
+                this.boss.update(dt, this.map, this.player, this.bombs, this.enemies, this.particleSystem);
+            }
+
+            for (let i = this.bombs.length - 1; i >= 0; i--) {
+                this.bombs[i].update(dt, this.map, this.bombs, this.enemies, this.boss, this.particleSystem);
+                if (this.bombs[i].toBeRemoved) this.bombs.splice(i, 1);
+            }
+
+            this.checkCollisions();
+            this.updateUI();
+            
+            if (this.player && this.player.isAlive) {
+                this.checkLevelClear();
+            }
         }
     }
 
     draw() {
         this.ctx.save();
-        // Aplica Tremor de Tela (Screen Shake)
         this.ctx.translate(this.particleSystem.shakeOffsetX, this.particleSystem.shakeOffsetY);
         this.ctx.clearRect(-20, -20, CONSTANTS.CANVAS_WIDTH + 40, CONSTANTS.CANVAS_HEIGHT + 40);
 
-        // Cenário e Ladrilhos
         this.map.draw(this.ctx, this.spriteLoader, this.level, this.player);
 
-        // Bombas
         for (let bomb of this.bombs) {
             bomb.draw(this.ctx, this.spriteLoader);
         }
 
-        // Projéteis Rasengan & Chidori
         for (let rasengan of this.rasengans) {
             rasengan.draw(this.ctx, this.spriteLoader);
         }
@@ -985,17 +999,14 @@ class Game {
             }
         }
 
-        // Inimigos
         for (let enemy of this.enemies) {
             enemy.draw(this.ctx, this.spriteLoader);
         }
         
-        // Boss
         if (this.boss) {
             this.boss.draw(this.ctx, this.spriteLoader);
         }
 
-        // Jogador 1 e Jogador 2
         if (this.player) {
             this.player.draw(this.ctx, this.spriteLoader);
         }
@@ -1003,7 +1014,6 @@ class Game {
             this.player2.draw(this.ctx, this.spriteLoader);
         }
 
-        // Partículas, Estilhaços, Ondas de Choque e Textos Flutuantes
         this.particleSystem.draw(this.ctx);
 
         this.ctx.restore();
