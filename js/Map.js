@@ -193,7 +193,6 @@ class LevelMap {
         const itemSprite = spriteLoader ? spriteLoader.get('items') : null;
         const doorAndKeySprite = spriteLoader ? spriteLoader.get('door_and_key') : null;
 
-        // Seletor de linha do sprite sheet (0, 1 ou 2) ou efeitos de cor por bioma
         const spriteRow = Math.min(2, this.currentLevelBiome % 3);
 
         for (let row = 0; row < CONSTANTS.GRID_HEIGHT; row++) {
@@ -207,16 +206,15 @@ class LevelMap {
                     const th = tileSprite.height / 3;
 
                     ctx.save();
-                    // Tonalidade de cor única para cada bioma da história
                     if (this.currentLevelBiome === CONSTANTS.BIOMES.VOLCANO) {
-                        ctx.filter = 'hue-rotate(-40deg) saturate(1.4)'; // Tom avermelhado vulcânico
+                        ctx.filter = 'hue-rotate(-40deg) saturate(1.4)';
                     } else if (this.currentLevelBiome === CONSTANTS.BIOMES.CYBER) {
-                        ctx.filter = 'hue-rotate(160deg) contrast(1.2)'; // Tom ciano cibernético
+                        ctx.filter = 'hue-rotate(160deg) contrast(1.2)';
                     } else if (this.currentLevelBiome === CONSTANTS.BIOMES.THRONE) {
-                        ctx.filter = 'hue-rotate(240deg) brightness(0.85) contrast(1.3)'; // Trono sombrio
+                        ctx.filter = 'hue-rotate(240deg) brightness(0.85) contrast(1.3)';
                     }
 
-                    // Chão
+                    // Chão Base
                     ctx.drawImage(
                         tileSprite,
                         2 * tw, spriteRow * th, tw, th,
@@ -224,13 +222,18 @@ class LevelMap {
                         CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                     );
 
+                    // Detalhes e Props procedurais de Piso
+                    if (tile === CONSTANTS.TILE_EMPTY) {
+                        this.drawFloorDetails(ctx, col, row, x, y);
+                    }
+
                     // Porta Secreta
                     if (this.door && this.door.col === col && this.door.row === row && tile === CONSTANTS.TILE_EMPTY) {
                         this.door.isRevealed = true;
                         this.drawDoorTile(ctx, doorAndKeySprite, x, y, player);
                     }
 
-                    // Paredes e Tijolos
+                    // Paredes e Tijolos com Relevo e Bevel 3D
                     if (tile === CONSTANTS.TILE_SOLID) {
                         ctx.drawImage(
                             tileSprite,
@@ -238,6 +241,8 @@ class LevelMap {
                             x, y,
                             CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                         );
+                        this.drawBlock3DBevel(ctx, x, y, true);
+
                     } else if (tile === CONSTANTS.TILE_SOFT) {
                         ctx.drawImage(
                             tileSprite,
@@ -245,6 +250,7 @@ class LevelMap {
                             x, y,
                             CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                         );
+                        this.drawBlock3DBevel(ctx, x, y, false);
                     }
                     ctx.restore();
                 } else {
@@ -259,11 +265,11 @@ class LevelMap {
             }
         }
 
-        // Desenha Power-ups
+        // Desenha Power-ups com auras
         for (let p of this.powerUps) {
             const px = p.col * CONSTANTS.TILE_SIZE;
             const py = p.row * CONSTANTS.TILE_SIZE;
-            const floatOffset = Math.sin((Date.now() + p.col * 200) / 180) * 2;
+            const floatOffset = Math.sin((Date.now() + p.col * 200) / 180) * 2.5;
 
             if (p.type === 'key' && doorAndKeySprite) {
                 const kw = doorAndKeySprite.width / 2;
@@ -339,6 +345,55 @@ class LevelMap {
                 ctx.drawImage(itemSprite, sx * iw, sy * ih, iw, ih, px + 4, py + 4 + floatOffset, CONSTANTS.TILE_SIZE - 8, CONSTANTS.TILE_SIZE - 8);
             }
         }
+    }
+
+    // Relevo 3D / Bevel e destaques de luz
+    drawBlock3DBevel(ctx, x, y, isSolid = false) {
+        ctx.save();
+        // Luz na borda superior
+        ctx.fillStyle = isSolid ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 255, 255, 0.16)';
+        ctx.fillRect(x, y, CONSTANTS.TILE_SIZE, 3);
+        ctx.fillRect(x, y, 3, CONSTANTS.TILE_SIZE);
+
+        // Sombra na borda inferior e direita
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+        ctx.fillRect(x, y + CONSTANTS.TILE_SIZE - 4, CONSTANTS.TILE_SIZE, 4);
+        ctx.fillRect(x + CONSTANTS.TILE_SIZE - 4, y, 4, CONSTANTS.TILE_SIZE);
+        ctx.restore();
+    }
+
+    // Props decorativos no chão
+    drawFloorDetails(ctx, col, row, x, y) {
+        const seed = (col * 17 + row * 31) % 100;
+        if (seed > 35) return;
+
+        ctx.save();
+        if (this.currentLevelBiome === CONSTANTS.BIOMES.FOREST) {
+            // Tufo de grama / florzinha sutil
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.arc(x + 16, y + 20, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255, 213, 79, 0.6)';
+            ctx.beginPath();
+            ctx.arc(x + 16, y + 20, 1.2, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (this.currentLevelBiome === CONSTANTS.BIOMES.CRYSTAL) {
+            // Cristais cintilantes no chão
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.35)';
+            ctx.fillRect(x + 20, y + 24, 3, 5);
+        } else if (this.currentLevelBiome === CONSTANTS.BIOMES.VOLCANO) {
+            // Fissura de magma
+            ctx.fillStyle = 'rgba(255, 87, 34, 0.4)';
+            ctx.fillRect(x + 12, y + 22, 8, 2);
+            ctx.fillRect(x + 16, y + 24, 4, 3);
+        } else if (this.currentLevelBiome === CONSTANTS.BIOMES.CYBER) {
+            // Trilha de circuito neon
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.25)';
+            ctx.fillRect(x + 10, y + 24, 12, 1.5);
+            ctx.fillRect(x + 22, y + 18, 1.5, 7);
+        }
+        ctx.restore();
     }
 
     drawDoorTile(ctx, doorAndKeySprite, x, y, player) {

@@ -59,9 +59,10 @@ class SoundManager {
         } catch (e) {}
     }
 
-    // ==========================================
-    // SINTETIZADOR DE TRILHA SONORA CHIPTUNE BGM
-    // ==========================================
+    playBGM(type = 'stage') {
+        this.startBGM(type);
+    }
+
     startBGM(type = 'stage') {
         this.currentBgmType = type;
         if (!this.enabled || !this.bgmEnabled) return;

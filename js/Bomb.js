@@ -103,11 +103,29 @@ class Bomb {
         }
     }
 
-    update(dt, map, bombsArray, enemies, boss, particleSystem) {
+    update(dt, map, bombsArray, enemies, boss, particleSystem, lightingSystem) {
         this.animTimer += dt;
         if (this.animTimer > 90) {
             this.animFrame = (this.animFrame + 1) % 4;
             this.animTimer = 0;
+        }
+
+        // Emite faíscas do pavio enquanto a bomba está acesa
+        if (!this.exploded && particleSystem) {
+            particleSystem.createBombFuseSpark(this.x + 24, this.y + 10);
+        }
+
+        // Registra luz dinâmica da bomba acesa
+        if (!this.exploded && lightingSystem) {
+            const pulse = 1 + Math.sin(Date.now() / 140) * 0.15;
+            lightingSystem.addLight(this.x + 24, this.y + 24, 75 * pulse, this.isIce ? '#00e5ff' : '#ff9800', 0.9);
+        }
+
+        // Registra flashes das explosões ativas
+        if (this.exploded && lightingSystem) {
+            for (let blast of this.blasts) {
+                lightingSystem.addLight(blast.col * CONSTANTS.TILE_SIZE + 24, blast.row * CONSTANTS.TILE_SIZE + 24, 95, '#ffaa00', 1.0);
+            }
         }
 
         // Verifica se as entidades que estavam em cima já saíram da bomba

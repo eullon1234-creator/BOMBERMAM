@@ -15,6 +15,44 @@ class ParticleSystem {
         this.shakeDuration = Math.max(this.shakeDuration, duration);
     }
 
+    // Poeira suave nos passos ao correr
+    createFootstepDust(x, y, dir = 'down') {
+        const count = 2 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.4 + Math.random() * 0.8;
+            this.particles.push({
+                type: 'dust',
+                x: x + (Math.random() - 0.5) * 8,
+                y: y + (Math.random() - 0.5) * 4,
+                vx: Math.cos(angle) * speed * 0.5,
+                vy: Math.sin(angle) * speed * 0.5 - 0.2,
+                size: 3 + Math.random() * 4,
+                color: 'rgba(210, 200, 185, 0.45)',
+                alpha: 0.65,
+                decay: 0.04 + Math.random() * 0.03
+            });
+        }
+    }
+
+    // Faíscas contínuas do pavio da bomba
+    createBombFuseSpark(x, y) {
+        if (Math.random() < 0.6) {
+            this.particles.push({
+                type: 'spark',
+                x: x + (Math.random() - 0.5) * 4,
+                y: y + (Math.random() - 0.5) * 4,
+                vx: (Math.random() - 0.5) * 1.5,
+                vy: -Math.random() * 1.5 - 0.5,
+                gravity: 0.04,
+                size: 1.5 + Math.random() * 2,
+                color: Math.random() < 0.5 ? '#ffcc00' : '#ff5722',
+                alpha: 1.0,
+                decay: 0.06
+            });
+        }
+    }
+
     // Estilhaços de tijolos quando uma caixa de tijolo é destruída
     createBrickDebris(x, y, biome = 0) {
         const colors = biome === 1 ? ['#5a5a6a', '#3a3a48', '#8a8a9a', '#222228'] // Dungeon
@@ -201,7 +239,7 @@ class ParticleSystem {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 ctx.fill();
-            } else if (p.type === 'smoke') {
+            } else if (p.type === 'smoke' || p.type === 'dust') {
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);

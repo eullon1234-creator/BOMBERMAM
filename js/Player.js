@@ -1,6 +1,7 @@
 class Player extends Entity {
     constructor(x, y, character = 'hero', playerIndex = 1) {
-        const boxSize = CONSTANTS.TILE_SIZE * 0.62;
+        // Tamanho da hitbox do personagem ligeiramente menor que o tile para passagem suave em corredores
+        const boxSize = CONSTANTS.TILE_SIZE * 0.60;
         super(x, y, boxSize, boxSize);
         
         this.character = character; // 'hero', 'hero_naruto', 'hero_sasuke', 'hero_warrior'
@@ -58,7 +59,7 @@ class Player extends Entity {
         this.hasKey = false;
         this.hasShield = false;
         this.shieldTimer = 0;
-        this.spawnShieldTimer = 1500; // 1.5s de imunidade inicial ao nascer
+        this.spawnShieldTimer = 1500;
         this.rasenganAmmo = 0;
         this.hasRemoteTrigger = false;
         this.hasIceBomb = false;
@@ -68,7 +69,6 @@ class Player extends Entity {
         this.curseTimer = 0;
         this.diarrheaTimer = 0;
 
-        // Score e Vitórias (especialmente para modo PvP)
         this.pvpWins = 0;
     }
 
@@ -87,7 +87,6 @@ class Player extends Entity {
         let inputX = 0;
         let inputY = 0;
 
-        // Efeito de maldição de controles invertidos
         const isInverted = (this.curseType === CONSTANTS.CURSE_TYPES.INVERTED && this.curseTimer > 0);
 
         if (this.keys.left) inputX += isInverted ? 1 : -1;
@@ -95,7 +94,6 @@ class Player extends Entity {
         if (this.keys.up) inputY += isInverted ? 1 : -1;
         if (this.keys.down) inputY += isInverted ? -1 : 1;
 
-        // Modificador de velocidade da maldição
         let effectiveSpeed = this.speed;
         if (this.curseTimer > 0) {
             if (this.curseType === CONSTANTS.CURSE_TYPES.SLOW) {
@@ -107,43 +105,40 @@ class Player extends Entity {
 
         const timeScale = Math.min(dt, 50) / 16.6667;
 
+        // Atualização precisa e sem ambiguidades da direção
+        if (inputY < 0) this.direction = 'up';
+        else if (inputY > 0) this.direction = 'down';
+        else if (inputX < 0) this.direction = 'left';
+        else if (inputX > 0) this.direction = 'right';
+
+        // Movimentação nítida e responsiva
         if (inputX !== 0 && inputY !== 0) {
             this.vx = inputX * effectiveSpeed * 0.72 * timeScale;
             this.vy = inputY * effectiveSpeed * 0.72 * timeScale;
         } else if (inputX !== 0) {
             this.vx = inputX * effectiveSpeed * timeScale;
-            this.direction = inputX > 0 ? 'right' : 'left';
         } else if (inputY !== 0) {
             this.vy = inputY * effectiveSpeed * timeScale;
-            this.direction = inputY > 0 ? 'down' : 'up';
         }
 
-        if (inputX !== 0 && inputY === 0) {
-            this.direction = inputX > 0 ? 'right' : 'left';
-        } else if (inputY !== 0 && inputX === 0) {
-            this.direction = inputY > 0 ? 'down' : 'up';
+        // Maldição de Diarreia de Bombas
+        if (this.curseTimer > 0 && this.curseType === CONSTANTS.CURSE_TYPES.DIARRHEA) {
+            this.diarrheaTimer += dt;
+            if (this.diarrheaTimer > 600) {
+                this.diarrheaTimer = 0;
+                this.placeBomb(map, bombsArray, game);
+            }
         }
 
-        this.isMoving = (this.vx !== 0 || this.vy !== 0);
-
-        // Plantar Bomba Manualmente
+        // Plantar Bomba (Espaço / Enter)
         if (this.keys.action && !this.actionPressed) {
             this.actionPressed = true;
-            this.plantBomb(map, bombsArray);
+            this.placeBomb(map, bombsArray, game);
         } else if (!this.keys.action) {
             this.actionPressed = false;
         }
 
-        // Maldição de Diarreia de Bombas (Planta bombas automaticamente)
-        if (this.curseType === CONSTANTS.CURSE_TYPES.DIARRHEA && this.curseTimer > 0) {
-            this.diarrheaTimer += dt;
-            if (this.diarrheaTimer > 380) {
-                this.plantBomb(map, bombsArray);
-                this.diarrheaTimer = 0;
-            }
-        }
-
-        // Disparar Golpe Especial (Tecla Z / L)
+        // Usar Especial (Tecla Z / L)
         if (this.keys.special && !this.specialPressed) {
             this.specialPressed = true;
             this.castSpecial(game);
@@ -187,7 +182,6 @@ class Player extends Entity {
         const startY = this.y + (this.height - pSize) / 2;
 
         if (this.character === 'hero_sasuke') {
-            // Chidori Elétrico
             const proj = new ChidoriProjectile(startX, startY, this.direction, this);
             if (!game.chidoris) game.chidoris = [];
             game.chidoris.push(proj);
@@ -195,15 +189,12 @@ class Player extends Entity {
             if (game.particleSystem) game.particleSystem.addScreenShake(8, 200);
 
         } else if (this.character === 'hero_warrior') {
-            // Ciclone Flamejante 360° do Guerreiro
             this.castWarriorFlameCyclone(game);
 
         } else if (this.character === 'hero') {
-            // Bomberman Clássico: Mega Bomba Instantânea com Raio Triplo
             this.castMegaBomb(game);
 
         } else {
-            // Rasengan do Naruto
             const proj = new RasenganProjectile(startX, startY, this.direction, this);
             if (!game.rasengans) game.rasengans = [];
             game.rasengans.push(proj);
@@ -224,12 +215,10 @@ class Player extends Entity {
         }
 
         const myGrid = this.getGridPos();
-        // Atinge área 3x3 ao redor do Guerreiro
         for (let r = myGrid.row - 1; r <= myGrid.row + 1; r++) {
             for (let c = myGrid.col - 1; c <= myGrid.col + 1; c++) {
                 if (r < 0 || r >= CONSTANTS.GRID_HEIGHT || c < 0 || c >= CONSTANTS.GRID_WIDTH) continue;
                 
-                // Quebra blocos de tijolo
                 if (game.map.grid[r][c] === CONSTANTS.TILE_SOFT) {
                     game.map.grid[r][c] = CONSTANTS.TILE_EMPTY;
                     if (game.particleSystem) {
@@ -241,20 +230,23 @@ class Player extends Entity {
                     game.score += 30;
                 }
 
-                // Causa dano massivo a inimigos na área
                 const hitBox = { x: c * CONSTANTS.TILE_SIZE, y: r * CONSTANTS.TILE_SIZE, width: CONSTANTS.TILE_SIZE, height: CONSTANTS.TILE_SIZE };
                 if (game.enemies) {
                     for (let enemy of game.enemies) {
                         if (enemy.isAlive && enemy.checkCollision(hitBox)) {
                             const isDead = enemy.takeDamage(3, game.map);
                             if (isDead) {
-                                game.score += enemy.scoreValue || 200;
+                                game.comboCount++;
+                                game.score += (enemy.scoreValue || 150) * 2;
+                                game.updateUI();
                             }
                         }
                     }
                 }
                 if (game.boss && game.boss.isAlive && game.boss.checkCollision(hitBox)) {
-                    game.boss.takeDamage(3);
+                    game.boss.takeDamage(2);
+                    game.score += 250;
+                    game.updateUI();
                 }
             }
         }
@@ -262,38 +254,49 @@ class Player extends Entity {
 
     castMegaBomb(game) {
         const gridPos = this.getGridPos();
-        const megaRadius = this.bombRadius + 3;
-        const b = new Bomb(gridPos.col * CONSTANTS.TILE_SIZE, gridPos.row * CONSTANTS.TILE_SIZE, gridPos.col, gridPos.row, megaRadius, this, false, false);
-        game.bombs.push(b);
+        const bomb = new Bomb(gridPos.col * CONSTANTS.TILE_SIZE, gridPos.row * CONSTANTS.TILE_SIZE, gridPos.col, gridPos.row, this.bombRadius + 3, this, false, false);
+        game.bombs.push(bomb);
         game.map.grid[gridPos.row][gridPos.col] = CONSTANTS.TILE_BOMB;
-        this.bombsActive++;
-
-        if (window.soundManager) window.soundManager.playBombDrop();
+        
+        if (window.soundManager) window.soundManager.playBombPlant();
         if (game.particleSystem) {
-            game.particleSystem.addFloatingText(this.x + 24, this.y - 12, "MEGA BOMB!", "#00e5ff", 13, true);
+            game.particleSystem.addFloatingText(this.x + this.width/2, this.y - 15, "MEGA BOMBA!", "#ff5722", 13, true);
         }
     }
 
-    plantBomb(map, bombsArray) {
+    placeBomb(map, bombsArray, game) {
+        if (!this.isAlive) return;
         if (this.bombsActive >= this.bombCapacity) return;
 
         const gridPos = this.getGridPos();
+        
+        if (map.grid[gridPos.row][gridPos.col] === CONSTANTS.TILE_BOMB) return;
         for (let b of bombsArray) {
-            if (b.col === gridPos.col && b.row === gridPos.row && !b.toBeRemoved) {
+            if (b.col === gridPos.col && b.row === gridPos.row && !b.exploded && !b.toBeRemoved) {
                 return;
             }
         }
 
-        const bombX = gridPos.col * CONSTANTS.TILE_SIZE;
-        const bombY = gridPos.row * CONSTANTS.TILE_SIZE;
+        const isIce = this.hasIceBomb;
+        this.hasIceBomb = false;
 
-        const newBomb = new Bomb(bombX, bombY, gridPos.col, gridPos.row, this.bombRadius, this, this.hasRemoteTrigger, this.hasIceBomb);
-        bombsArray.push(newBomb);
-        map.grid[gridPos.row][gridPos.col] = CONSTANTS.TILE_BOMB;
+        const bomb = new Bomb(
+            gridPos.col * CONSTANTS.TILE_SIZE,
+            gridPos.row * CONSTANTS.TILE_SIZE,
+            gridPos.col,
+            gridPos.row,
+            this.bombRadius,
+            this,
+            this.hasRemoteTrigger,
+            isIce
+        );
+        
         this.bombsActive++;
+        bombsArray.push(bomb);
+        map.grid[gridPos.row][gridPos.col] = CONSTANTS.TILE_BOMB;
 
         if (window.soundManager) {
-            window.soundManager.playBombDrop();
+            window.soundManager.playBombPlant();
         }
     }
 
@@ -303,11 +306,6 @@ class Player extends Entity {
             return;
         }
 
-        if (this.castTimer > 0) {
-            this.castTimer -= dt;
-        }
-
-        // Atualiza maldição da caveira
         if (this.curseTimer > 0) {
             this.curseTimer -= dt;
             if (this.curseTimer <= 0) {
@@ -315,237 +313,174 @@ class Player extends Entity {
             }
         }
 
-        // Atualiza temporizadores de escudo
+        if (this.shieldTimer > 0) {
+            this.shieldTimer -= dt;
+            if (this.shieldTimer <= 0) this.hasShield = false;
+        }
         if (this.spawnShieldTimer > 0) {
             this.spawnShieldTimer -= dt;
         }
-        if (this.shieldTimer > 0) {
-            this.shieldTimer -= dt;
-            this.hasShield = true;
-        } else {
-            this.hasShield = false;
+
+        if (this.castTimer > 0) {
+            this.castTimer -= dt;
         }
 
         this.handleInput(map, bombsArray, game, dt);
 
-        // Atualiza animação de passos
+        this.isMoving = (this.vx !== 0 || this.vy !== 0);
+
         if (this.isMoving) {
             this.animTimer += dt;
-            const frameDelay = (this.character === 'hero_warrior') ? 70 : 100;
-            const maxFrames  = (this.character === 'hero_warrior') ? 8  : 4;
-            if (this.animTimer > frameDelay) {
-                this.animFrame = (this.animFrame + 1) % maxFrames;
+            if (this.animTimer > 110) {
+                this.animFrame = (this.animFrame + 1) % 4;
                 this.animTimer = 0;
             }
         } else {
             this.animFrame = 0;
         }
 
-        this.moveSmoothly(map, bombsArray, game, dt);
-    }
-
-    moveSmoothly(map, bombsArray, game, dt = 16.6667) {
+        // ========================================================
+        // MOVIMENTO E DESLIZAMENTO DE CANTOS SUAVE (CORNER SLIDE)
+        // ========================================================
         if (this.vx !== 0) {
-            this.x += this.vx;
-            if (this.checkCollisions(map, bombsArray, game)) {
-                this.x -= this.vx;
-                this.assistCornerY(map, bombsArray, game, dt);
-            }
-        }
+            const nextX = this.x + this.vx;
+            if (!this.checkMapCollision(nextX, this.y, map) && !this.checkBombCollision(nextX, this.y, bombsArray, map, game)) {
+                this.x = nextX;
+            } else {
+                // Alinhamento vertical automático ao tentar entrar em corredores
+                const centerY = this.y + this.height / 2;
+                const targetRow = Math.floor(centerY / CONSTANTS.TILE_SIZE);
+                const idealY = targetRow * CONSTANTS.TILE_SIZE + (CONSTANTS.TILE_SIZE - this.height) / 2;
+                const diffY = idealY - this.y;
 
-        if (this.vy !== 0) {
-            this.y += this.vy;
-            if (this.checkCollisions(map, bombsArray, game)) {
-                this.y -= this.vy;
-                this.assistCornerX(map, bombsArray, game, dt);
-            }
-        }
-    }
-
-    assistCornerY(map, bombsArray, game, dt = 16.6667) {
-        const centerY = this.y + this.height / 2;
-        const tileRow = Math.floor(centerY / CONSTANTS.TILE_SIZE);
-        const tileCenterY = (tileRow + 0.5) * CONSTANTS.TILE_SIZE;
-        const diff = tileCenterY - centerY;
-        const timeScale = Math.min(dt, 50) / 16.6667;
-
-        if (Math.abs(diff) < 20) {
-            const slideStep = Math.sign(diff) * Math.min(Math.abs(diff), this.speed * 0.85 * timeScale);
-            this.y += slideStep;
-            if (this.checkCollisions(map, bombsArray, game)) {
-                this.y -= slideStep;
-            }
-        }
-    }
-
-    assistCornerX(map, bombsArray, game, dt = 16.6667) {
-        const centerX = this.x + this.width / 2;
-        const tileCol = Math.floor(centerX / CONSTANTS.TILE_SIZE);
-        const tileCenterX = (tileCol + 0.5) * CONSTANTS.TILE_SIZE;
-        const diff = tileCenterX - centerX;
-        const timeScale = Math.min(dt, 50) / 16.6667;
-
-        if (Math.abs(diff) < 20) {
-            const slideStep = Math.sign(diff) * Math.min(Math.abs(diff), this.speed * 0.85 * timeScale);
-            this.x += slideStep;
-            if (this.checkCollisions(map, bombsArray, game)) {
-                this.x -= slideStep;
-            }
-        }
-    }
-
-    checkCollisions(map, bombsArray, game) {
-        const left = this.x;
-        const right = this.x + this.width;
-        const top = this.y;
-        const bottom = this.y + this.height;
-
-        const points = [
-            { x: left + 2, y: top + 2 },
-            { x: right - 2, y: top + 2 },
-            { x: left + 2, y: bottom - 2 },
-            { x: right - 2, y: bottom - 2 }
-        ];
-
-        for (let p of points) {
-            const col = Math.floor(p.x / CONSTANTS.TILE_SIZE);
-            const row = Math.floor(p.y / CONSTANTS.TILE_SIZE);
-
-            if (col < 0 || col >= CONSTANTS.GRID_WIDTH || row < 0 || row >= CONSTANTS.GRID_HEIGHT) {
-                return true;
-            }
-
-            const tile = map.grid[row][col];
-            if (tile === CONSTANTS.TILE_SOLID || tile === CONSTANTS.TILE_SOFT) {
-                return true;
-            }
-        }
-
-        // Colisão com Bombas (Chute de Bombas integrado)
-        if (bombsArray) {
-            for (let bomb of bombsArray) {
-                if (!bomb.exploded && !bomb.toBeRemoved) {
-                    if (!bomb.overlappingEntities.has(this)) {
-                        if (this.checkCollision(bomb)) {
-                            if (this.isMoving && !bomb.isSliding) {
-                                bomb.kick(this.direction, map, bombsArray, game?.enemies, game?.boss, game?.particleSystem);
-                            }
-                            return true;
-                        }
+                if (Math.abs(diffY) <= 16 && Math.abs(diffY) > 0.5) {
+                    const slideSpeed = Math.min(Math.abs(diffY), this.speed * 0.85);
+                    const tryY = this.y + Math.sign(diffY) * slideSpeed;
+                    if (!this.checkMapCollision(this.x, tryY, map) && !this.checkBombCollision(this.x, tryY, bombsArray, map, game)) {
+                        this.y = tryY;
                     }
                 }
             }
         }
 
+        if (this.vy !== 0) {
+            const nextY = this.y + this.vy;
+            if (!this.checkMapCollision(this.x, nextY, map) && !this.checkBombCollision(this.x, nextY, bombsArray, map, game)) {
+                this.y = nextY;
+            } else {
+                // Alinhamento horizontal automático ao tentar entrar em corredores
+                const centerX = this.x + this.width / 2;
+                const targetCol = Math.floor(centerX / CONSTANTS.TILE_SIZE);
+                const idealX = targetCol * CONSTANTS.TILE_SIZE + (CONSTANTS.TILE_SIZE - this.width) / 2;
+                const diffX = idealX - this.x;
+
+                if (Math.abs(diffX) <= 16 && Math.abs(diffX) > 0.5) {
+                    const slideSpeed = Math.min(Math.abs(diffX), this.speed * 0.85);
+                    const tryX = this.x + Math.sign(diffX) * slideSpeed;
+                    if (!this.checkMapCollision(tryX, this.y, map) && !this.checkBombCollision(tryX, this.y, bombsArray, map, game)) {
+                        this.x = tryX;
+                    }
+                }
+            }
+        }
+    }
+
+    checkBombCollision(x, y, bombsArray, map, game) {
+        if (!bombsArray) return false;
+        
+        const myHitbox = { x, y, width: this.width, height: this.height };
+
+        for (let bomb of bombsArray) {
+            if (bomb.exploded || bomb.toBeRemoved) continue;
+
+            const bombHitbox = {
+                x: bomb.x + 4,
+                y: bomb.y + 4,
+                width: CONSTANTS.TILE_SIZE - 8,
+                height: CONSTANTS.TILE_SIZE - 8
+            };
+
+            const isColliding = !(
+                myHitbox.x + myHitbox.width <= bombHitbox.x ||
+                myHitbox.x >= bombHitbox.x + bombHitbox.width ||
+                myHitbox.y + myHitbox.height <= bombHitbox.y ||
+                myHitbox.y >= bombHitbox.y + bombHitbox.height
+            );
+
+            if (isColliding) {
+                if (bomb.overlappingEntities.has(this)) {
+                    continue;
+                }
+
+                if (!bomb.isSliding) {
+                    let kickDir = null;
+                    if (this.direction === 'left' && this.x > bomb.x) kickDir = 'left';
+                    else if (this.direction === 'right' && this.x < bomb.x) kickDir = 'right';
+                    else if (this.direction === 'up' && this.y > bomb.y) kickDir = 'up';
+                    else if (this.direction === 'down' && this.y < bomb.y) kickDir = 'down';
+
+                    if (kickDir) {
+                        bomb.kick(kickDir, map, bombsArray, game?.enemies, game?.boss, game?.particleSystem);
+                    }
+                }
+
+                return true;
+            } else {
+                if (bomb.overlappingEntities.has(this)) {
+                    bomb.overlappingEntities.delete(this);
+                }
+            }
+        }
+        return false;
+    }
+
+    checkMapCollision(x, y, map) {
+        const leftCol = Math.floor(x / CONSTANTS.TILE_SIZE);
+        const rightCol = Math.floor((x + this.width) / CONSTANTS.TILE_SIZE);
+        const topRow = Math.floor(y / CONSTANTS.TILE_SIZE);
+        const bottomRow = Math.floor((y + this.height) / CONSTANTS.TILE_SIZE);
+
+        for (let row = topRow; row <= bottomRow; row++) {
+            for (let col = leftCol; col <= rightCol; col++) {
+                if (row < 0 || row >= CONSTANTS.GRID_HEIGHT || col < 0 || col >= CONSTANTS.GRID_WIDTH) {
+                    return true;
+                }
+                const tile = map.grid[row][col];
+                if (tile === CONSTANTS.TILE_SOLID || tile === CONSTANTS.TILE_SOFT) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
     draw(ctx, spriteLoader) {
-        const spriteName = this.character || 'hero';
-        const sprite = spriteLoader ? spriteLoader.get(spriteName) : null;
+        const heroSprite = spriteLoader ? spriteLoader.get(this.character) : null;
         const doorAndKeySprite = spriteLoader ? spriteLoader.get('door_and_key') : null;
-        
-        const isInvulnerable = (this.spawnShieldTimer > 0 || this.hasShield);
-        if (isInvulnerable && Math.floor(Date.now() / 80) % 2 === 0) {
-            ctx.globalAlpha = 0.6;
+
+        const drawX = Math.round(this.x - (CONSTANTS.TILE_SIZE - this.width) / 2);
+        const drawY = Math.round(this.y - (CONSTANTS.TILE_SIZE - this.height) / 2);
+
+        if (this.spawnShieldTimer > 0) {
+            ctx.globalAlpha = (Math.floor(Date.now() / 80) % 2 === 0) ? 0.35 : 1.0;
         }
 
-        if (sprite && this.character === 'hero_warrior') {
-            const COLS = 8;
-            const ROWS = 8;
-            const frameW = sprite.width / COLS;
-            const frameH = sprite.height / ROWS;
+        if (heroSprite) {
             let row = 0;
-            let flipH = false;
-            let colFrame = this.isMoving ? (this.animFrame % COLS) : 0;
+            if (this.direction === 'down') row = 0;
+            else if (this.direction === 'right') row = 1;
+            else if (this.direction === 'up') row = 2;
+            else if (this.direction === 'left') row = 3;
 
-            if (!this.isAlive) {
-                row = 7;
-                colFrame = Math.min(COLS - 1, Math.floor(this.deathTimer / 100));
-                ctx.save();
-                ctx.globalAlpha = Math.max(0, 1 - this.deathTimer / 800);
-                ctx.drawImage(
-                    sprite,
-                    colFrame * frameW, row * frameH, frameW, frameH,
-                    this.x - (CONSTANTS.TILE_SIZE - this.width) / 2,
-                    this.y - (CONSTANTS.TILE_SIZE - this.height) / 2 - 8,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8
-                );
-                ctx.restore();
-                ctx.globalAlpha = 1.0;
-                return;
-            }
+            const frameWidth = heroSprite.width / 4;
+            const frameHeight = heroSprite.height / 4;
 
-            if (this.direction === 'down')       { row = 0; flipH = false; }
-            else if (this.direction === 'up')    { row = 1; flipH = false; }
-            else if (this.direction === 'left')  { row = 2; flipH = false; }
-            else if (this.direction === 'right') { row = 2; flipH = true;  }
-
-            if (!this.isMoving) {
-                const idlePulse = Math.floor(Date.now() / 500) % 2;
-                colFrame = idlePulse;
-            }
-
-            const drawX = this.x - (CONSTANTS.TILE_SIZE - this.width) / 2;
-            const drawY = this.y - (CONSTANTS.TILE_SIZE - this.height) / 2 - 8;
-
-            ctx.save();
-            const auraPulse = 0.85 + Math.sin(Date.now() / 300) * 0.15;
-            ctx.shadowColor = 'rgba(255, 200, 50, 0.5)';
-            ctx.shadowBlur = 8 * auraPulse;
-
-            if (flipH) {
-                ctx.translate(drawX + CONSTANTS.TILE_SIZE, drawY);
-                ctx.scale(-1, 1);
-                ctx.drawImage(sprite, colFrame * frameW, row * frameH, frameW, frameH, 0, 0, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8);
-            } else {
-                ctx.drawImage(sprite, colFrame * frameW, row * frameH, frameW, frameH, drawX, drawY, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 8);
-            }
-            ctx.restore();
-
-        } else if (sprite) {
-            const frameW = sprite.width / 4;
-            const frameH = sprite.height / 4;
-            let row = 0;
-            let flipH = false;
-
-            if (!this.isAlive) {
-                row = 3;
-                const deathFrame = Math.min(3, Math.floor(this.deathTimer / 150));
-                ctx.drawImage(
-                    sprite,
-                    deathFrame * frameW, row * frameH, frameW, frameH,
-                    this.x - (CONSTANTS.TILE_SIZE - this.width)/2,
-                    this.y - (CONSTANTS.TILE_SIZE - this.height)/2 - 6,
-                    CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 6
-                );
-                ctx.globalAlpha = 1.0;
-                return;
-            }
-
-            if (this.direction === 'down') { row = 0; flipH = false; }
-            else if (this.direction === 'up') { row = 1; flipH = false; }
-            else if (this.direction === 'right') { row = 2; flipH = false; }
-            else if (this.direction === 'left') { row = 2; flipH = true; }
-
-            const drawX = this.x - (CONSTANTS.TILE_SIZE - this.width)/2;
-            const drawY = this.y - (CONSTANTS.TILE_SIZE - this.height)/2 - 6;
-
-            ctx.save();
-            // Diferenciação visual para Player 2 (aura ciano neon)
-            if (this.playerIndex === 2) {
-                ctx.shadowColor = '#00e5ff';
-                ctx.shadowBlur = 10;
-            }
-
-            if (flipH) {
-                ctx.translate(drawX + CONSTANTS.TILE_SIZE, drawY);
-                ctx.scale(-1, 1);
-                ctx.drawImage(sprite, this.animFrame * frameW, row * frameH, frameW, frameH, 0, 0, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 6);
-            } else {
-                ctx.drawImage(sprite, this.animFrame * frameW, row * frameH, frameW, frameH, drawX, drawY, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE + 6);
-            }
-            ctx.restore();
+            ctx.drawImage(
+                heroSprite,
+                this.animFrame * frameWidth, row * frameHeight, frameWidth, frameHeight,
+                drawX, drawY,
+                CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
+            );
         } else if (this.character === 'hero_sasuke') {
             this.drawProceduralSasuke(ctx);
         } else {
@@ -579,7 +514,7 @@ class Player extends Entity {
             ctx.restore();
         }
 
-        // Efeito de Maldição da Caveira (Ícone flutuante roxo acima do herói)
+        // Efeito de Maldição da Caveira (Ícone flutuante)
         if (this.isAlive && this.curseTimer > 0) {
             ctx.save();
             const floatY = Math.sin(Date.now() / 120) * 3;
@@ -591,7 +526,7 @@ class Player extends Entity {
             ctx.restore();
         }
 
-        // Indicador de P1 ou P2 acima do personagem no modo versus
+        // Indicador P1 / P2
         if (this.isAlive) {
             ctx.save();
             ctx.font = 'bold 9px "Outfit", sans-serif';
@@ -607,16 +542,6 @@ class Player extends Entity {
     }
 
     drawProceduralSasuke(ctx) {
-        if (!this.isAlive) {
-            ctx.save();
-            ctx.fillStyle = 'rgba(26, 35, 126, 0.4)';
-            ctx.beginPath();
-            ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-            return;
-        }
-
         const cx = this.x + this.width / 2;
         const cy = this.y + this.height / 2;
         const walkOffset = this.isMoving ? Math.sin(this.animTimer / 25) * 2.5 : 0;

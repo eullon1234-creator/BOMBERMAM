@@ -6,6 +6,7 @@ class Game {
         this.spriteLoader = new SpriteLoader();
         this.map = new LevelMap();
         this.particleSystem = new ParticleSystem();
+        this.lightingSystem = new LightingSystem();
         
         this.player = null;   // Player 1
         this.player2 = null;  // Player 2 (Modo PvP)
@@ -933,6 +934,38 @@ class Game {
             }
         }
 
+        if (this.lightingSystem) {
+            this.lightingSystem.clear();
+            
+            // Luz do Jogador 1
+            if (this.player && this.player.isAlive) {
+                const pPulse = 1 + Math.sin(Date.now() / 300) * 0.05;
+                const pColor = (this.player.character === 'hero_sasuke') ? 'rgba(0, 229, 255, 0.4)' 
+                             : (this.player.character === 'hero_naruto') ? 'rgba(255, 152, 0, 0.4)'
+                             : (this.player.character === 'hero_warrior') ? 'rgba(255, 87, 34, 0.45)'
+                             : 'rgba(255, 213, 79, 0.35)';
+                this.lightingSystem.addLight(this.player.x + this.player.width/2, this.player.y + this.player.height/2, 140 * pPulse, pColor, 0.9);
+            }
+
+            // Luz do Jogador 2 (PvP)
+            if (this.player2 && this.player2.isAlive && this.mode === CONSTANTS.GAME_MODES.PVP) {
+                this.lightingSystem.addLight(this.player2.x + this.player2.width/2, this.player2.y + this.player2.height/2, 140, 'rgba(0, 229, 255, 0.4)', 0.9);
+            }
+
+            // Luz do Boss
+            if (this.boss && this.boss.isAlive) {
+                const bossPulse = 1 + Math.sin(Date.now() / 150) * 0.1;
+                this.lightingSystem.addLight(this.boss.x + this.boss.width/2, this.boss.y + this.boss.height/2, 180 * bossPulse, 'rgba(255, 23, 68, 0.5)', 0.95);
+            }
+
+            // Brilho dos Itens / Power-ups
+            if (this.map && this.map.powerUps) {
+                for (let p of this.map.powerUps) {
+                    this.lightingSystem.addLight(p.col * CONSTANTS.TILE_SIZE + 24, p.row * CONSTANTS.TILE_SIZE + 24, 50, 'rgba(255, 213, 79, 0.3)', 0.7);
+                }
+            }
+        }
+
         if (this.state !== CONSTANTS.STATE_CUTSCENE) {
             if (this.player) {
                 this.player.update(dt, this.map, this.bombs, this);
@@ -966,7 +999,7 @@ class Game {
             }
 
             for (let i = this.bombs.length - 1; i >= 0; i--) {
-                this.bombs[i].update(dt, this.map, this.bombs, this.enemies, this.boss, this.particleSystem);
+                this.bombs[i].update(dt, this.map, this.bombs, this.enemies, this.boss, this.particleSystem, this.lightingSystem);
                 if (this.bombs[i].toBeRemoved) this.bombs.splice(i, 1);
             }
 
@@ -984,8 +1017,15 @@ class Game {
         this.ctx.translate(this.particleSystem.shakeOffsetX, this.particleSystem.shakeOffsetY);
         this.ctx.clearRect(-20, -20, CONSTANTS.CANVAS_WIDTH + 40, CONSTANTS.CANVAS_HEIGHT + 40);
 
+        // 1. Chão e Mapa
         this.map.draw(this.ctx, this.spriteLoader, this.level, this.player);
 
+        // 2. Sombras Suaves Projetadas (Drop Shadows)
+        if (this.lightingSystem) {
+            this.lightingSystem.drawDropShadows(this.ctx, this.map, [this.player, this.player2], this.enemies, this.boss, this.bombs);
+        }
+
+        // 3. Entidades e Itens
         for (let bomb of this.bombs) {
             bomb.draw(this.ctx, this.spriteLoader);
         }
@@ -1015,6 +1055,11 @@ class Game {
         }
 
         this.particleSystem.draw(this.ctx);
+
+        // 4. Camada de Iluminação Dinâmica 2D & Vinheta de Pós-processamento
+        if (this.lightingSystem) {
+            this.lightingSystem.render(this.ctx, this.map.currentLevelBiome);
+        }
 
         this.ctx.restore();
     }
