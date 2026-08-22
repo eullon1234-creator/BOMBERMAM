@@ -346,7 +346,7 @@ class Player extends Entity {
         if (this.isMoving) {
             this.animTimer += dt;
             if (this.animTimer > 110) {
-                this.animFrame = (this.animFrame + 1) % 4;
+                this.animFrame = (this.animFrame + 1) % 24; // Use LCM or a large number, modulo happens in draw
                 this.animTimer = 0;
             }
         } else {
@@ -568,21 +568,34 @@ class Player extends Entity {
             const frameHeight = heroSprite.height / rows;
             const currentFrame = this.animFrame % animFrames;
 
-            ctx.save();
+            // Ajuste de escala (o guerreiro tem muito espaço vazio no frame 64x64)
+            let drawWidth = CONSTANTS.TILE_SIZE;
+            let drawHeight = CONSTANTS.TILE_SIZE;
             let finalDrawX = drawX;
             let finalDrawY = drawY;
+
+            if (this.character === 'hero_warrior') {
+                const scale = 1.7; // 70% maior
+                drawWidth = CONSTANTS.TILE_SIZE * scale;
+                drawHeight = CONSTANTS.TILE_SIZE * scale;
+                finalDrawX = drawX - (drawWidth - CONSTANTS.TILE_SIZE) / 2;
+                // Move mais pra cima pra alinhar os pés
+                finalDrawY = drawY - (drawHeight - CONSTANTS.TILE_SIZE) / 1.2;
+            }
+
+            ctx.save();
             if (flip) {
-                ctx.translate(drawX + CONSTANTS.TILE_SIZE / 2, drawY + CONSTANTS.TILE_SIZE / 2);
+                ctx.translate(finalDrawX + drawWidth / 2, finalDrawY + drawHeight / 2);
                 ctx.scale(-1, 1);
-                finalDrawX = -CONSTANTS.TILE_SIZE / 2;
-                finalDrawY = -CONSTANTS.TILE_SIZE / 2;
+                finalDrawX = -drawWidth / 2;
+                finalDrawY = -drawHeight / 2;
             }
 
             ctx.drawImage(
                 heroSprite,
                 currentFrame * frameWidth, row * frameHeight, frameWidth, frameHeight,
                 finalDrawX, finalDrawY,
-                CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
+                drawWidth, drawHeight
             );
             ctx.restore();
         } else if (this.character === 'hero_sasuke') {
