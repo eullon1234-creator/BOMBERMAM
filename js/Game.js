@@ -45,6 +45,8 @@ class Game {
         this.comboCount = 0;
         this.comboTimer = 0;
 
+        this.levelEditor = new LevelEditor(this);
+
         this.updateHighScoreDisplay();
         this.bindEvents();
         this.init();
@@ -68,6 +70,9 @@ class Game {
         this.mode = modeKey;
         this.updateModeSelectionUI();
         window.soundManager?.playSelect();
+        if (modeKey === CONSTANTS.GAME_MODES.BUILDER) {
+            this.openLevelEditor();
+        }
     }
 
     updateModeSelectionUI() {
@@ -246,7 +251,28 @@ class Game {
             restartBtn.addEventListener('click', () => {
                 window.soundManager?.playSelect();
                 document.getElementById('game-over-screen')?.classList.add('hidden');
-                this.startGame();
+                if (this.mode === CONSTANTS.GAME_MODES.CUSTOM && this.lastCustomLevelData) {
+                    this.startCustomLevel(this.lastCustomLevelData);
+                } else {
+                    this.startGame();
+                }
+            });
+        }
+
+        const openBuilderBtn = document.getElementById('btn-open-builder');
+        if (openBuilderBtn) {
+            openBuilderBtn.addEventListener('click', () => {
+                window.soundManager?.playSelect();
+                this.openLevelEditor();
+            });
+            openBuilderBtn.addEventListener('mouseenter', () => window.soundManager?.playHover());
+        }
+
+        const customBackEditorBtn = document.getElementById('btn-custom-back-editor');
+        if (customBackEditorBtn) {
+            customBackEditorBtn.addEventListener('click', () => {
+                window.soundManager?.playSelect();
+                this.openLevelEditor();
             });
         }
     }
@@ -259,6 +285,76 @@ class Game {
     closeModal(id) {
         const modal = document.getElementById(id);
         if (modal) modal.classList.add('hidden');
+    }
+
+    openLevelEditor() {
+        this.state = CONSTANTS.STATE_BUILDER;
+        this.mode = CONSTANTS.GAME_MODES.BUILDER;
+        this.isPaused = false;
+
+        document.getElementById('start-menu-screen')?.classList.add('hidden');
+        document.getElementById('ui-layer')?.classList.add('hidden');
+        document.getElementById('game-over-screen')?.classList.add('hidden');
+        document.getElementById('modal-pause')?.classList.add('hidden');
+        document.getElementById('dialogue-overlay')?.classList.add('hidden');
+        document.getElementById('builder-ui-layer')?.classList.remove('hidden');
+
+        window.soundManager?.startBGM('menu');
+    }
+
+    startCustomLevel(levelData) {
+        if (!levelData) return;
+        this.lastCustomLevelData = levelData;
+        this.mode = CONSTANTS.GAME_MODES.CUSTOM;
+        this.state = CONSTANTS.STATE_PLAYING;
+        this.isPaused = false;
+        this.lives = 3;
+        this.score = 0;
+
+        document.getElementById('start-menu-screen')?.classList.add('hidden');
+        document.getElementById('builder-ui-layer')?.classList.add('hidden');
+        document.getElementById('game-over-screen')?.classList.add('hidden');
+        document.getElementById('modal-pause')?.classList.add('hidden');
+        document.getElementById('ui-layer')?.classList.remove('hidden');
+
+        // Inicializa Mapa Customizado
+        this.particleSystem.clear();
+        this.map.loadCustomLevel(levelData);
+
+        // Instancia Jogador 1
+        const p1Col = levelData.playerSpawn ? levelData.playerSpawn.col : 1;
+        const p1Row = levelData.playerSpawn ? levelData.playerSpawn.row : 1;
+        this.player = new Player(p1Col * CONSTANTS.TILE_SIZE, p1Row * CONSTANTS.TILE_SIZE, this.selectedCharacter, 1);
+
+        // Instancia Jogador 2 se houver spawn P2 configurado
+        if (levelData.player2Spawn && (levelData.player2Spawn.col !== p1Col || levelData.player2Spawn.row !== p1Row)) {
+            this.player2 = new Player(levelData.player2Spawn.col * CONSTANTS.TILE_SIZE, levelData.player2Spawn.row * CONSTANTS.TILE_SIZE, this.selectedCharacterP2, 2);
+        } else {
+            this.player2 = null;
+        }
+
+        // Instancia Inimigos customizados
+        this.enemies = [];
+        if (levelData.enemies && Array.isArray(levelData.enemies)) {
+            for (let e of levelData.enemies) {
+                this.enemies.push(new Enemy(e.col * CONSTANTS.TILE_SIZE, e.row * CONSTANTS.TILE_SIZE, e.type));
+            }
+        }
+
+        // Instancia Boss se configurado
+        if (levelData.boss) {
+            this.boss = new Boss(levelData.boss.col * CONSTANTS.TILE_SIZE, levelData.boss.row * CONSTANTS.TILE_SIZE);
+        } else {
+            this.boss = null;
+        }
+
+        this.bombs = [];
+        this.rasengans = [];
+        this.chidoris = [];
+
+        window.soundManager?.playGameStart();
+        window.soundManager?.startBGM('stage');
+        this.updateUI();
     }
 
     togglePause() {
@@ -291,6 +387,11 @@ class Game {
     }
 
     startGame() {
+        if (this.mode === CONSTANTS.GAME_MODES.BUILDER) {
+            this.openLevelEditor();
+            return;
+        }
+
         window.soundManager?.playGameStart();
         
         this.lives = 3;
@@ -314,11 +415,16 @@ class Game {
         };
         
         document.getElementById('start-menu-screen')?.classList.add('hidden');
+        document.getElementById('builder-ui-layer')?.classList.add('hidden');
         document.getElementById('game-over-screen')?.classList.add('hidden');
         document.getElementById('modal-pause')?.classList.add('hidden');
         document.getElementById('ui-layer')?.classList.remove('hidden');
         
         this.initLevel(this.level);
+    }
+
+    openMenu() {
+        this.returnToMenu();
     }
 
     returnToMenu() {
@@ -329,6 +435,7 @@ class Game {
         this.isPaused = false;
         
         document.getElementById('dialogue-overlay')?.classList.add('hidden');
+        document.getElementById('builder-ui-layer')?.classList.add('hidden');
         document.getElementById('start-menu-screen')?.classList.remove('hidden');
         document.getElementById('game-over-screen')?.classList.add('hidden');
         document.getElementById('modal-pause')?.classList.add('hidden');
@@ -338,24 +445,37 @@ class Game {
     }
 
     handleKey(e, isDown) {
+        // Ignora digitação em caixas de texto (ex: modal JSON)
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+            return;
+        }
+
+        const keyLower = e.key ? e.key.toLowerCase() : '';
+        const gameKeyList = [' ', 'space', 'enter', 'escape', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'z', 'x', 'l', 'k', 'b', 'p'];
+        if (gameKeyList.includes(keyLower) || e.key === ' ') {
+            e.preventDefault();
+        }
+
         // Se houver diálogo ativo, teclas Espaço/Enter avançam e ESC pula
         const dialogueOverlay = document.getElementById('dialogue-overlay');
         const isDialogueOpen = dialogueOverlay && !dialogueOverlay.classList.contains('hidden');
 
-        if (isDialogueOpen && isDown) {
-            if (e.key === ' ' || e.key === 'Enter') {
-                window.dialogueSystem?.advance();
-                return;
-            } else if (e.key === 'Escape') {
-                window.dialogueSystem?.skip();
-                return;
+        if (isDialogueOpen) {
+            if (isDown) {
+                if (e.key === ' ' || keyLower === 'space' || e.key === 'Enter') {
+                    window.dialogueSystem?.advance();
+                } else if (e.key === 'Escape') {
+                    window.dialogueSystem?.skip();
+                }
             }
+            return;
         }
 
         if (this.state === CONSTANTS.STATE_MENU && isDown) {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === 'Enter' || e.key === ' ' || keyLower === 'space') {
                 const anyModalOpen = !document.getElementById('modal-how-to-play')?.classList.contains('hidden') ||
-                                     !document.getElementById('modal-guide')?.classList.contains('hidden');
+                                     !document.getElementById('modal-guide')?.classList.contains('hidden') ||
+                                     !document.getElementById('modal-builder-json')?.classList.contains('hidden');
                 if (!anyModalOpen) {
                     this.startGame();
                     return;
@@ -363,7 +483,7 @@ class Game {
             }
         }
 
-        if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+        if (e.key === 'Escape' || keyLower === 'p') {
             if (isDown) {
                 if (this.state === CONSTANTS.STATE_PLAYING) {
                     this.togglePause();
@@ -371,8 +491,15 @@ class Game {
                 } else if (this.state === CONSTANTS.STATE_MENU) {
                     this.closeModal('modal-how-to-play');
                     this.closeModal('modal-guide');
+                    this.closeModal('modal-builder-json');
                 }
             }
+            return;
+        }
+
+        // Tecla [B] para voltar ao editor durante o Playtest Customizado
+        if (isDown && (keyLower === 'b') && this.mode === CONSTANTS.GAME_MODES.CUSTOM) {
+            this.openLevelEditor();
             return;
         }
 
@@ -380,7 +507,7 @@ class Game {
 
         // Controles Jogador 1 (WASD + Espaço + Z + X)
         if (this.player) {
-            switch(e.key.toLowerCase()) {
+            switch(keyLower) {
                 case 'w': this.player.keys.up = isDown; break;
                 case 's': this.player.keys.down = isDown; break;
                 case 'a': this.player.keys.left = isDown; break;
@@ -398,7 +525,7 @@ class Game {
 
         // Controles Jogador 2 (Setas + Enter/Numpad0 + L + K)
         if (this.player2 && this.mode === CONSTANTS.GAME_MODES.PVP) {
-            switch(e.key.toLowerCase()) {
+            switch(keyLower) {
                 case 'arrowup': this.player2.keys.up = isDown; break;
                 case 'arrowdown': this.player2.keys.down = isDown; break;
                 case 'arrowleft': this.player2.keys.left = isDown; break;
@@ -478,6 +605,10 @@ class Game {
             this.state = CONSTANTS.STATE_CUTSCENE;
             window.dialogueSystem?.startDialogue(dialogueKey, this.selectedCharacter, () => {
                 this.state = CONSTANTS.STATE_PLAYING;
+                if (this.player) {
+                    this.player.keys.action = false;
+                    this.player.actionPressed = true;
+                }
                 if (levelNum === 5) {
                     window.soundManager?.startBGM('boss');
                 } else {
@@ -542,7 +673,9 @@ class Game {
         const powerShieldEl = document.getElementById('hud-power-shield');
         
         if (charEl) {
-            if (this.mode === CONSTANTS.GAME_MODES.PVP) {
+            if (this.mode === CONSTANTS.GAME_MODES.CUSTOM) {
+                charEl.innerText = `🛠️ ${this.lastCustomLevelData?.name || 'Playtest Custom'}`;
+            } else if (this.mode === CONSTANTS.GAME_MODES.PVP) {
                 charEl.innerText = `⚔️ PvP: P1 (${this.p1Wins}) x (${this.p2Wins}) P2`;
             } else if (this.selectedCharacter === 'hero_sasuke') {
                 charEl.innerText = '⚡ Sasuke';
@@ -569,7 +702,9 @@ class Game {
         if (scoreEl) scoreEl.innerText = `Score: ${this.score}`;
         
         if (levelEl) {
-            if (this.mode === CONSTANTS.GAME_MODES.ENDLESS) {
+            if (this.mode === CONSTANTS.GAME_MODES.CUSTOM) {
+                levelEl.innerText = "Fase: Criada [B: Editor]";
+            } else if (this.mode === CONSTANTS.GAME_MODES.ENDLESS) {
                 levelEl.innerText = `Onda: ${this.wave}`;
             } else if (this.mode === CONSTANTS.GAME_MODES.PVP) {
                 const secs = Math.max(0, Math.ceil(this.pvpMatchTimer / 1000));
@@ -599,6 +734,12 @@ class Game {
             else statRasenganBox.classList.remove('active-ready');
         }
 
+        const statSpikeEl = document.getElementById('hud-stat-spike');
+        if (statSpikeEl && this.player) {
+            if (this.player.hasSpikeBomb) statSpikeEl.classList.remove('hidden');
+            else statSpikeEl.classList.add('hidden');
+        }
+
         if (statShieldEl && powerShieldEl && this.player) {
             if (this.player.hasShield) {
                 statShieldEl.classList.remove('hidden');
@@ -612,7 +753,13 @@ class Game {
         }
 
         if (keyEl) {
-            if (this.mode === CONSTANTS.GAME_MODES.ENDLESS) {
+            if (this.mode === CONSTANTS.GAME_MODES.CUSTOM) {
+                if (this.map.door && this.map.door.isRevealed) {
+                    keyEl.innerText = this.player?.hasKey ? "🔑 Porta Aberta!" : "🚪 Portal Revelado!";
+                } else {
+                    keyEl.innerText = `👾 Monstros: ${this.enemies.filter(e => e.isAlive).length}`;
+                }
+            } else if (this.mode === CONSTANTS.GAME_MODES.ENDLESS) {
                 keyEl.innerText = `🌊 Monstros: ${this.enemies.filter(e => e.isAlive).length}`;
             } else if (this.mode === CONSTANTS.GAME_MODES.PVP) {
                 keyEl.innerText = "⚔️ Batalha 1v1";
@@ -651,6 +798,12 @@ class Game {
                     pEntity.hasRemoteTrigger = true;
                     this.score += 200;
                     this.particleSystem.addFloatingText(itemX, itemY - 15, "DETONADOR [X]!", "#e91e63", 12, true);
+                    window.soundManager?.playPowerUp();
+
+                } else if (p.type === 'spike') {
+                    pEntity.hasSpikeBomb = true;
+                    this.score += 200;
+                    this.particleSystem.addFloatingText(itemX, itemY - 15, "📌 SPIKE BOMB!", "#ff1744", 12, true);
                     window.soundManager?.playPowerUp();
 
                 } else if (p.type === 'skull') {
@@ -897,6 +1050,25 @@ class Game {
                 this.saveHighScore();
                 setTimeout(() => this.initLevel(1), 1200);
             }
+        } else if (this.mode === CONSTANTS.GAME_MODES.CUSTOM) {
+            let customCleared = false;
+            if (this.map.door && (this.map.door.isRevealed || this.map.grid[this.map.door.row][this.map.door.col] === CONSTANTS.TILE_EMPTY)) {
+                const playerGrid = this.player?.getGridPos();
+                if (playerGrid && playerGrid.col === this.map.door.col && playerGrid.row === this.map.door.row) {
+                    if (this.player.hasKey) customCleared = true;
+                }
+            } else if (this.enemies.length > 0 && this.enemies.every(e => !e.isAlive) && (!this.boss || !this.boss.isAlive)) {
+                customCleared = true;
+            }
+
+            if (customCleared) {
+                window.soundManager?.playVictory();
+                this.particleSystem.addFloatingText(CONSTANTS.CANVAS_WIDTH/2, CONSTANTS.CANVAS_HEIGHT/2, "FASE CONCLUÍDA!", "#00e676", 26, true);
+                setTimeout(() => {
+                    alert("🎉 Parabéns! Você concluiu a fase personalizada!");
+                    this.openLevelEditor();
+                }, 1200);
+            }
         }
     }
 
@@ -905,7 +1077,9 @@ class Game {
         const dt = Math.min(timestamp - this.lastTime, 50);
         this.lastTime = timestamp;
 
-        if ((this.state === CONSTANTS.STATE_PLAYING || this.state === CONSTANTS.STATE_CUTSCENE) && this.isLoaded && !this.isPaused) {
+        if (this.state === CONSTANTS.STATE_BUILDER) {
+            this.levelEditor.render(this.spriteLoader);
+        } else if ((this.state === CONSTANTS.STATE_PLAYING || this.state === CONSTANTS.STATE_CUTSCENE) && this.isLoaded && !this.isPaused) {
             this.update(dt);
             this.draw();
         }

@@ -1,5 +1,5 @@
 class Bomb {
-    constructor(x, y, col, row, radius, owner, isRemote = false, isIce = false) {
+    constructor(x, y, col, row, radius, owner, isRemote = false, isIce = false, isSpike = false) {
         this.x = x;
         this.y = y;
         this.col = col;
@@ -10,6 +10,7 @@ class Bomb {
         this.owner = owner;
         this.isRemote = isRemote;
         this.isIce = isIce;
+        this.isSpike = isSpike;
         
         this.timer = isRemote ? 15000 : 2400; // Bomba remota espera comando manual (failsafe de 15s)
         this.exploded = false;
@@ -118,13 +119,15 @@ class Bomb {
         // Registra luz dinâmica da bomba acesa
         if (!this.exploded && lightingSystem) {
             const pulse = 1 + Math.sin(Date.now() / 140) * 0.15;
-            lightingSystem.addLight(this.x + 24, this.y + 24, 75 * pulse, this.isIce ? '#00e5ff' : '#ff9800', 0.9);
+            const lightColor = this.isSpike ? '#ff1744' : (this.isIce ? '#00e5ff' : '#ff9800');
+            lightingSystem.addLight(this.x + 24, this.y + 24, 78 * pulse, lightColor, 0.95);
         }
 
         // Registra flashes das explosões ativas
         if (this.exploded && lightingSystem) {
             for (let blast of this.blasts) {
-                lightingSystem.addLight(blast.col * CONSTANTS.TILE_SIZE + 24, blast.row * CONSTANTS.TILE_SIZE + 24, 95, '#ffaa00', 1.0);
+                const blastColor = this.isSpike ? '#ff1744' : (this.isIce ? '#00e5ff' : '#ffaa00');
+                lightingSystem.addLight(blast.col * CONSTANTS.TILE_SIZE + 24, blast.row * CONSTANTS.TILE_SIZE + 24, 100, blastColor, 1.0);
             }
         }
 
@@ -238,7 +241,9 @@ class Bomb {
         this.timer = 500;
         
         if (window.soundManager) {
-            if (this.isIce) {
+            if (this.isSpike) {
+                window.soundManager.playSpikeExplosion();
+            } else if (this.isIce) {
                 window.soundManager.playFreeze();
             } else {
                 window.soundManager.playExplosion();
@@ -253,9 +258,14 @@ class Bomb {
         const cy = this.row * CONSTANTS.TILE_SIZE + CONSTANTS.TILE_SIZE / 2;
 
         if (particleSystem) {
-            particleSystem.addScreenShake(6, 220);
-            particleSystem.createShockwave(cx, cy, 45, this.isIce ? 'rgba(0, 229, 255, 0.85)' : 'rgba(255, 170, 0, 0.85)');
-            particleSystem.createExplosionSparks(cx, cy, this.isIce ? '#00e5ff' : '#ff9800', 16);
+            particleSystem.addScreenShake(this.isSpike ? 8 : 6, 230);
+            const waveColor = this.isSpike ? 'rgba(255, 23, 68, 0.9)' : (this.isIce ? 'rgba(0, 229, 255, 0.85)' : 'rgba(255, 170, 0, 0.85)');
+            const sparkColor = this.isSpike ? '#ff1744' : (this.isIce ? '#00e5ff' : '#ff9800');
+            particleSystem.createShockwave(cx, cy, 50, waveColor);
+            particleSystem.createExplosionSparks(cx, cy, sparkColor, this.isSpike ? 24 : 16);
+            if (this.isSpike) {
+                particleSystem.addFloatingText(cx, cy - 14, "PIERCE!", "#ff1744", 12, true);
+            }
         }
 
         this.blasts.push({ col: this.col, row: this.row, type: 'center' });
@@ -296,6 +306,9 @@ class Bomb {
                         const bx = targetCol * CONSTANTS.TILE_SIZE;
                         const by = targetRow * CONSTANTS.TILE_SIZE;
                         particleSystem.createBrickDebris(bx, by, map.currentLevelBiome || 0);
+                        if (this.isSpike) {
+                            particleSystem.createExplosionSparks(bx + 24, by + 24, '#ff1744', 8);
+                        }
                     }
                     if (window.soundManager) {
                         window.soundManager.playBrickCrumble();
@@ -311,7 +324,14 @@ class Bomb {
                             map.spawnPowerUp(targetCol, targetRow);
                         }
                     }
-                    break;
+
+                    // Se NÃO for Spike Bomb, a explosão para no primeiro bloco quebrado.
+                    // Se FOR Spike Bomb, perfura e continua em linha reta!
+                    if (!this.isSpike) {
+                        break;
+                    } else {
+                        continue;
+                    }
                 }
 
                 this.blasts.push({ col: targetCol, row: targetRow, type: blastType });
@@ -330,8 +350,11 @@ class Bomb {
 
             if (!this.exploded) {
                 ctx.save();
-                // Efeito especial de brilho se for bomba remota ou congelante
-                if (this.isRemote) {
+                // Efeito especial de brilho se for bomba remota, congelante ou spike
+                if (this.isSpike) {
+                    ctx.shadowColor = '#ff1744';
+                    ctx.shadowBlur = 14;
+                } else if (this.isRemote) {
                     ctx.shadowColor = '#e91e63';
                     ctx.shadowBlur = 12;
                 } else if (this.isIce) {
@@ -345,6 +368,29 @@ class Bomb {
                     this.x, this.y,
                     CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
                 );
+
+                // Indicador de espinhos metálicos pontiagudos para Spike Bomb
+                if (this.isSpike) {
+                    ctx.fillStyle = '#ff1744';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5;
+                    const cx = this.x + CONSTANTS.TILE_SIZE / 2;
+                    const cy = this.y + CONSTANTS.TILE_SIZE / 2;
+                    // 4 Espinhos pontiagudos
+                    const spikeLen = 8 + Math.sin(Date.now() / 100) * 2;
+                    const pts = [
+                        [cx, cy - 16 - spikeLen],
+                        [cx, cy + 16 + spikeLen],
+                        [cx - 16 - spikeLen, cy],
+                        [cx + 16 + spikeLen, cy]
+                    ];
+                    pts.forEach(([px, py]) => {
+                        ctx.beginPath();
+                        ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                    });
+                }
 
                 // Indicador de antena piscante para bomba remota
                 if (this.isRemote) {
@@ -378,6 +424,9 @@ class Bomb {
                     ctx.save();
                     ctx.translate(bx + CONSTANTS.TILE_SIZE / 2, by + CONSTANTS.TILE_SIZE / 2);
                     ctx.rotate(angle);
+                    if (this.isSpike) {
+                        ctx.filter = 'hue-rotate(320deg) saturate(1.8)';
+                    }
                     ctx.drawImage(
                         sprite,
                         this.animFrame * frameW, row * frameH, frameW, frameH,
@@ -389,12 +438,12 @@ class Bomb {
             }
         } else {
             if (!this.exploded) {
-                ctx.fillStyle = this.isRemote ? '#d81b60' : CONSTANTS.COLORS.BOMB;
+                ctx.fillStyle = this.isSpike ? '#ff1744' : (this.isRemote ? '#d81b60' : CONSTANTS.COLORS.BOMB);
                 ctx.beginPath();
                 ctx.arc(this.x + CONSTANTS.TILE_SIZE/2, this.y + CONSTANTS.TILE_SIZE/2, CONSTANTS.TILE_SIZE*0.4, 0, Math.PI * 2);
                 ctx.fill();
             } else {
-                ctx.fillStyle = CONSTANTS.COLORS.EXPLOSION;
+                ctx.fillStyle = this.isSpike ? '#ff1744' : CONSTANTS.COLORS.EXPLOSION;
                 for (let blast of this.blasts) {
                     ctx.fillRect(blast.col * CONSTANTS.TILE_SIZE, blast.row * CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE);
                 }

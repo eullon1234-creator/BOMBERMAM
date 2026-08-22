@@ -29,14 +29,20 @@ class DialogueSystem {
         this.skipBtn = document.getElementById('dialogue-skip-btn');
 
         if (this.nextBtn) {
-            this.nextBtn.addEventListener('click', () => this.advance());
+            this.nextBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.advance();
+            });
         }
         if (this.skipBtn) {
-            this.skipBtn.addEventListener('click', () => this.skip());
+            this.skipBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.skip();
+            });
         }
         if (this.dialogueBox) {
             this.dialogueBox.addEventListener('click', (e) => {
-                if (e.target !== this.skipBtn) {
+                if (e.target !== this.skipBtn && e.target !== this.nextBtn) {
                     this.advance();
                 }
             });

@@ -25,6 +25,7 @@
                     <span id="key-display" class="key-status">🔑 Chave: ❌</span>
                 </div>
                 <div class="hud-right">
+                    <button id="btn-custom-back-editor" class="hud-btn hidden" title="Voltar ao Editor [B]">🛠️ Editor [B]</button>
                     <button id="in-game-pause-btn" class="hud-btn" title="Pausar Jogo [P / ESC]">⏸️ Pausa</button>
                     <button id="in-game-sound-btn" class="hud-btn" title="Alternar Som">🔊</button>
                     <button id="in-game-menu-btn" class="hud-btn" title="Voltar ao Menu">🏠 Menu</button>
@@ -54,6 +55,11 @@
                     <span class="power-text">Especial:</span>
                     <strong class="power-val" id="hud-power-rasengan">0</strong>
                     <span class="power-key-tag">[Z]</span>
+                </div>
+                <div class="power-stat-pill power-spike hidden" id="hud-stat-spike" title="Bomba Perfurante Ativa (Atravessa tijolos)">
+                    <span class="power-icon">📌</span>
+                    <span class="power-text">Spike:</span>
+                    <strong class="power-val" id="hud-power-spike">ON</strong>
                 </div>
                 <div class="power-stat-pill power-shield hidden" id="hud-stat-shield" title="Tempo de Escudo Restante">
                     <span class="power-icon">🛡️</span>
@@ -139,6 +145,13 @@
                                 <div class="mode-info">
                                     <strong class="mode-title">BATALHA 1v1</strong>
                                     <span class="mode-desc">2 Jogadores no Teclado</span>
+                                </div>
+                            </div>
+                            <div class="mode-card" data-mode="builder">
+                                <span class="mode-icon">🛠️</span>
+                                <div class="mode-info">
+                                    <strong class="mode-title">CRIADOR DE FASES</strong>
+                                    <span class="mode-desc">Level Studio + Playtest</span>
                                 </div>
                             </div>
                         </div>
@@ -248,6 +261,10 @@
                             <span class="btn-shortcut">[ENTER]</span>
                         </button>
                         <div class="menu-sub-actions">
+                            <button id="btn-open-builder" class="menu-btn btn-builder">
+                                <span class="btn-icon">🛠️</span>
+                                <span class="btn-text">CRIADOR DE FASES</span>
+                            </button>
                             <button id="btn-how-to-play" class="menu-btn btn-secondary">
                                 <span class="btn-icon">🕹️</span>
                                 <span class="btn-text">COMO JOGAR</span>
@@ -458,6 +475,105 @@
             </div>
         </div>
 
+        <!-- INTERFACE DO EDITOR DE FASES (LEVEL BUILDER STUDIO) -->
+        <div id="builder-ui-layer" class="builder-ui-layer hidden">
+            <!-- Barra Superior do Editor -->
+            <div class="builder-top-bar">
+                <div class="builder-title-group">
+                    <span class="builder-badge">🛠️ LEVEL STUDIO</span>
+                    <select id="builder-biome-select" class="builder-select" title="Escolha o Bioma do Mapa">
+                        <option value="0">🌲 Bioma: Floresta</option>
+                        <option value="1">❄️ Bioma: Caverna de Gelo</option>
+                        <option value="2">🌋 Bioma: Forja Vulcânica</option>
+                        <option value="3">⚡ Bioma: Cyber Lab</option>
+                        <option value="4">👑 Bioma: Trono do Titã</option>
+                    </select>
+                    <select id="builder-template-select" class="builder-select" title="Carregar Template Pronto">
+                        <option value="">📂 Carregar Template...</option>
+                        <option value="classic">🏛️ Arena Clássica</option>
+                        <option value="ice_cavern">🧊 Caverna de Gelo</option>
+                        <option value="conveyor_factory">🏭 Fábrica de Esteiras</option>
+                        <option value="boss_arena">👑 Arena Boss & Portais</option>
+                    </select>
+                </div>
+                <div class="builder-actions-group">
+                    <button id="btn-builder-playtest" class="builder-btn btn-playtest" title="Testar Fase Criada Agora">▶️ TESTAR FASE</button>
+                    <button id="btn-builder-save" class="builder-btn" title="Salvar Fase no Navegador">💾 Salvar</button>
+                    <button id="btn-builder-export" class="builder-btn" title="Exportar Código JSON">📋 Exportar</button>
+                    <button id="btn-builder-import" class="builder-btn" title="Importar Código JSON">📥 Importar</button>
+                    <button id="btn-builder-clear" class="builder-btn btn-danger" title="Limpar Mapa">🧹 Limpar</button>
+                    <button id="btn-builder-back-menu" class="builder-btn btn-back" title="Voltar ao Menu Principal">🏠 Menu</button>
+                </div>
+            </div>
+
+            <!-- Paleta de Ferramentas Flutuante -->
+            <div class="builder-palette-dock">
+                <div class="palette-category">
+                    <span class="palette-cat-title">🧱 Terrenos</span>
+                    <div class="palette-buttons-row">
+                        <button class="builder-tool-btn active" data-tool="tile_solid" title="Parede Indestrutível">🧱</button>
+                        <button class="builder-tool-btn" data-tool="tile_soft" title="Bloco Destrutível (Tijolo)">📦</button>
+                        <button class="builder-tool-btn" data-tool="tile_empty" title="Piso Vazio">⬜</button>
+                        <button class="builder-tool-btn" data-tool="tile_ice" title="Piso de Gelo (Desliza)">🧊</button>
+                        <button class="builder-tool-btn" data-tool="tile_conveyor_up" title="Esteira ↑">⬆️</button>
+                        <button class="builder-tool-btn" data-tool="tile_conveyor_down" title="Esteira ↓">⬇️</button>
+                        <button class="builder-tool-btn" data-tool="tile_conveyor_left" title="Esteira ←">⬅️</button>
+                        <button class="builder-tool-btn" data-tool="tile_conveyor_right" title="Esteira →">➡️</button>
+                        <button class="builder-tool-btn" data-tool="tile_portal_a" title="Portal A (Azul)">🌀A</button>
+                        <button class="builder-tool-btn" data-tool="tile_portal_b" title="Portal B (Laranja)">🌀B</button>
+                    </div>
+                </div>
+
+                <div class="palette-category">
+                    <span class="palette-cat-title">👤 Spawns & Inimigos</span>
+                    <div class="palette-buttons-row">
+                        <button class="builder-tool-btn" data-tool="spawn_p1" title="Spawn Jogador 1">👤 P1</button>
+                        <button class="builder-tool-btn" data-tool="spawn_p2" title="Spawn Jogador 2">👥 P2</button>
+                        <button class="builder-tool-btn" data-tool="enemy_ballom" title="Balão Vermelho (Ballom)">🎈</button>
+                        <button class="builder-tool-btn" data-tool="enemy_oneal" title="Slime Azul (Oneal)">💧</button>
+                        <button class="builder-tool-btn" data-tool="enemy_dahl" title="Golem Laranja (Dahl)">🗿</button>
+                        <button class="builder-tool-btn" data-tool="enemy_minvo" title="Morcego Roxo (Minvo)">🦇</button>
+                        <button class="builder-tool-btn" data-tool="enemy_boss" title="Grande Chefe Titã">👑</button>
+                    </div>
+                </div>
+
+                <div class="palette-category">
+                    <span class="palette-cat-title">💎 Itens & Poderes</span>
+                    <div class="palette-buttons-row">
+                        <button class="builder-tool-btn" data-tool="item_key" title="Chave Mística">🔑</button>
+                        <button class="builder-tool-btn" data-tool="item_door" title="Porta / Saída">🚪</button>
+                        <button class="builder-tool-btn" data-tool="power_bomb" title="Bomba Extra">💣</button>
+                        <button class="builder-tool-btn" data-tool="power_fire" title="Fogo Extra">🔥</button>
+                        <button class="builder-tool-btn" data-tool="power_speed" title="Velocidade">⚡</button>
+                        <button class="builder-tool-btn" data-tool="power_shield" title="Escudo Mágico">🛡️</button>
+                        <button class="builder-tool-btn" data-tool="power_remote" title="Detonador Remoto">⏱️</button>
+                        <button class="builder-tool-btn" data-tool="power_ice" title="Bomba de Gelo">❄️</button>
+                        <button class="builder-tool-btn" data-tool="power_spike" title="Bomba Perfurante Spike">📌</button>
+                        <button class="builder-tool-btn" data-tool="power_rasengan" title="Poder Especial">🌀</button>
+                        <button class="builder-tool-btn" data-tool="power_skull" title="Caveira da Maldição">💀</button>
+                        <button class="builder-tool-btn btn-tool-erase" data-tool="erase" title="Borracha / Limpar Tile">🧹</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: IMPORTAR / EXPORTAR JSON -->
+        <div id="modal-builder-json" class="modal-backdrop hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2 id="builder-json-title">📋 CÓDIGO DA FASE (JSON)</h2>
+                    <button class="modal-close-btn" data-close="modal-builder-json">✖</button>
+                </div>
+                <div class="modal-body">
+                    <textarea id="builder-json-textarea" class="builder-textarea" rows="8" placeholder="Código JSON da fase..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-builder-json-action" class="menu-btn btn-primary">EXECUTAR AÇÃO</button>
+                    <button class="menu-btn btn-secondary close-modal-btn" data-close="modal-builder-json">FECHAR</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Tela de Game Over / Vitória -->
         <div id="game-over-screen" class="hidden">
             <div class="game-over-box">
@@ -486,6 +602,7 @@
     <script src="js/Enemy.js"></script>
     <script src="js/Boss.js"></script>
     <script src="js/Map.js"></script>
+    <script src="js/LevelEditor.js"></script>
     <script src="js/Game.js"></script>
 </body>
 </html>

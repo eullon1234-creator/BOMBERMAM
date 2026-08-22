@@ -63,6 +63,10 @@ class Player extends Entity {
         this.rasenganAmmo = 0;
         this.hasRemoteTrigger = false;
         this.hasIceBomb = false;
+        this.hasSpikeBomb = false;
+        this.portalCooldown = 0;
+        this.iceSlideVx = 0;
+        this.iceSlideVy = 0;
 
         // Sistema de Maldição da Caveira (Skull Curse)
         this.curseType = null;
@@ -278,7 +282,9 @@ class Player extends Entity {
         }
 
         const isIce = this.hasIceBomb;
+        const isSpike = this.hasSpikeBomb;
         this.hasIceBomb = false;
+        this.hasSpikeBomb = false;
 
         const bomb = new Bomb(
             gridPos.col * CONSTANTS.TILE_SIZE,
@@ -288,7 +294,8 @@ class Player extends Entity {
             this.bombRadius,
             this,
             this.hasRemoteTrigger,
-            isIce
+            isIce,
+            isSpike
         );
         
         this.bombsActive++;
@@ -325,6 +332,10 @@ class Player extends Entity {
             this.castTimer -= dt;
         }
 
+        if (this.portalCooldown > 0) {
+            this.portalCooldown -= dt;
+        }
+
         this.handleInput(map, bombsArray, game, dt);
 
         this.isMoving = (this.vx !== 0 || this.vy !== 0);
@@ -337,6 +348,66 @@ class Player extends Entity {
             }
         } else {
             this.animFrame = 0;
+        }
+
+        // ========================================================
+        // FÍSICA DE ARMADILHAS DE CENÁRIO: ESTEIRAS, GELO E PORTAIS
+        // ========================================================
+        const centerCol = Math.floor((this.x + this.width / 2) / CONSTANTS.TILE_SIZE);
+        const centerRow = Math.floor((this.y + this.height / 2) / CONSTANTS.TILE_SIZE);
+
+        // 1. Esteiras Rolantes (Conveyors)
+        if (map && map.getConveyorVelocity) {
+            const conv = map.getConveyorVelocity(centerCol, centerRow);
+            if (conv) {
+                const timeScale = Math.min(dt, 50) / 16.6667;
+                const tryX = this.x + conv.vx * timeScale;
+                const tryY = this.y + conv.vy * timeScale;
+                if (!this.checkMapCollision(tryX, this.y, map) && !this.checkBombCollision(tryX, this.y, bombsArray, map, game)) {
+                    this.x = tryX;
+                }
+                if (!this.checkMapCollision(this.x, tryY, map) && !this.checkBombCollision(this.x, tryY, bombsArray, map, game)) {
+                    this.y = tryY;
+                }
+            }
+        }
+
+        // 2. Portais Dimensionais (Portals)
+        if (this.portalCooldown <= 0 && map && map.getPortalTeleport) {
+            const dest = map.getPortalTeleport(centerCol, centerRow);
+            if (dest) {
+                this.portalCooldown = 1100;
+                this.x = dest.col * CONSTANTS.TILE_SIZE + (CONSTANTS.TILE_SIZE - this.width) / 2;
+                this.y = dest.row * CONSTANTS.TILE_SIZE + (CONSTANTS.TILE_SIZE - this.height) / 2;
+                if (window.soundManager) window.soundManager.playPortalWarp();
+                if (game?.particleSystem) {
+                    game.particleSystem.createShockwave(this.x + this.width / 2, this.y + this.height / 2, 48, '#00e5ff');
+                    game.particleSystem.addFloatingText(this.x + this.width / 2, this.y - 12, "WARP!", "#00e5ff", 12, true);
+                }
+            }
+        }
+
+        // 3. Piso de Gelo (Ice Slide)
+        const onIce = map && map.isIce && map.isIce(centerCol, centerRow);
+        if (onIce) {
+            if (this.vx !== 0 || this.vy !== 0) {
+                this.iceSlideVx = this.vx * 0.94;
+                this.iceSlideVy = this.vy * 0.94;
+            } else if (Math.abs(this.iceSlideVx) > 0.15 || Math.abs(this.iceSlideVy) > 0.15) {
+                this.iceSlideVx *= 0.93;
+                this.iceSlideVy *= 0.93;
+                const nextX = this.x + this.iceSlideVx;
+                const nextY = this.y + this.iceSlideVy;
+                if (!this.checkMapCollision(nextX, this.y, map) && !this.checkBombCollision(nextX, this.y, bombsArray, map, game)) {
+                    this.x = nextX;
+                }
+                if (!this.checkMapCollision(this.x, nextY, map) && !this.checkBombCollision(this.x, nextY, bombsArray, map, game)) {
+                    this.y = nextY;
+                }
+            }
+        } else {
+            this.iceSlideVx = 0;
+            this.iceSlideVy = 0;
         }
 
         // ========================================================

@@ -149,6 +149,20 @@ class Enemy extends Entity {
         }
 
         this.executeMovement(dt, map);
+
+        // Deslocamento por esteiras rolantes
+        if (map && map.getConveyorVelocity) {
+            const centerCol = Math.floor((this.x + this.width / 2) / CONSTANTS.TILE_SIZE);
+            const centerRow = Math.floor((this.y + this.height / 2) / CONSTANTS.TILE_SIZE);
+            const conv = map.getConveyorVelocity(centerCol, centerRow);
+            if (conv) {
+                const timeScale = Math.min(dt, 50) / 16.6667;
+                const tryX = this.x + conv.vx * timeScale;
+                const tryY = this.y + conv.vy * timeScale;
+                if (!this.checkCollision(tryX, this.y, map)) this.x = tryX;
+                if (!this.checkCollision(this.x, tryY, map)) this.y = tryY;
+            }
+        }
     }
 
     decideNextMove(map, player, bombs) {

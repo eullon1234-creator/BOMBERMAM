@@ -7,9 +7,16 @@ const CONSTANTS = {
     
     // Identificadores de blocos no mapa
     TILE_EMPTY: 0,
-    TILE_SOLID: 1, // Indestrutível
-    TILE_SOFT: 2,  // Destrutível (Tijolo)
-    TILE_BOMB: 3,  // Bomba plantada
+    TILE_SOLID: 1,           // Indestrutível
+    TILE_SOFT: 2,            // Destrutível (Tijolo)
+    TILE_BOMB: 3,            // Bomba plantada
+    TILE_ICE: 4,             // Piso de Gelo (reduz atrito e faz deslizar)
+    TILE_CONVEYOR_UP: 5,     // Esteira Rolante para Cima
+    TILE_CONVEYOR_DOWN: 6,   // Esteira Rolante para Baixo
+    TILE_CONVEYOR_LEFT: 7,   // Esteira Rolante para Esquerda
+    TILE_CONVEYOR_RIGHT: 8,  // Esteira Rolante para Direita
+    TILE_PORTAL_A: 9,        // Portal Dimensional A (Azul)
+    TILE_PORTAL_B: 10,       // Portal Dimensional B (Laranja)
     
     // Cores fallback (quando não há imagem)
     COLORS: {
@@ -30,12 +37,15 @@ const CONSTANTS = {
     STATE_VICTORY: 4,
     STATE_PAUSED: 5,
     STATE_CUTSCENE: 6,
+    STATE_BUILDER: 7,
 
     // Modos de Jogo
     GAME_MODES: {
         CAMPAIGN: 'campaign',   // 5 Fases do Modo História
         ENDLESS: 'endless',     // Hordas infinitas com ondas crescentes
-        PVP: 'pvp'              // 2 Jogadores local no mesmo teclado
+        PVP: 'pvp',             // 2 Jogadores local no mesmo teclado
+        BUILDER: 'builder',     // Editor de Fases interativo
+        CUSTOM: 'custom'        // Playtest da fase criada no editor
     },
 
     // Total de Fases da Campanha
@@ -69,7 +79,8 @@ const CONSTANTS = {
         RASENGAN: 'rasengan',
         REMOTE: 'remote',   // Detonador manual com tecla [X]
         SKULL: 'skull',     // Maldição temporária caótica
-        ICE: 'ice'          // Bomba congelante
+        ICE: 'ice',         // Bomba congelante
+        SPIKE: 'spike'      // Bomba perfurante que atravessa tijolos
     },
 
     // Efeitos da Maldição da Caveira (Skull Curse)

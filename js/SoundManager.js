@@ -512,6 +512,71 @@ class SoundManager {
             offset += n.d * 0.8;
         });
     }
+
+    playSpikeExplosion() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            // Impacto metálico penetrante
+            const oscMetal = this.ctx.createOscillator();
+            const gainMetal = this.ctx.createGain();
+            oscMetal.type = 'square';
+            oscMetal.frequency.setValueAtTime(880, now);
+            oscMetal.frequency.exponentialRampToValueAtTime(110, now + 0.15);
+            gainMetal.gain.setValueAtTime(0.25, now);
+            gainMetal.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            oscMetal.connect(gainMetal);
+            gainMetal.connect(this.ctx.destination);
+            oscMetal.start(now);
+            oscMetal.stop(now + 0.18);
+
+            // Explosão pesada
+            this.playExplosion();
+        } catch (e) {}
+    }
+
+    playPortalWarp() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(1400, now + 0.25);
+            gain.gain.setValueAtTime(0.22, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.28);
+        } catch (e) {}
+    }
+
+    playIceSlide() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        this.playTone(850, 'sine', 0.05, 0.08, 0.005);
+    }
+
+    playEditorPlace() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        this.playTone(540, 'triangle', 0.06, 0.12, 0.005);
+    }
+
+    playEditorErase() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        this.playTone(280, 'sawtooth', 0.05, 0.1, 0.005);
+    }
 }
 
 window.soundManager = new SoundManager();
