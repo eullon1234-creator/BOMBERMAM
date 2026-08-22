@@ -91,6 +91,9 @@ class Player extends Entity {
         let inputX = 0;
         let inputY = 0;
 
+        this.vx = 0;
+        this.vy = 0;
+
         const isInverted = (this.curseType === CONSTANTS.CURSE_TYPES.INVERTED && this.curseTimer > 0);
 
         if (this.keys.left) inputX += isInverted ? 1 : -1;
@@ -538,20 +541,50 @@ class Player extends Entity {
 
         if (heroSprite) {
             let row = 0;
-            if (this.direction === 'down') row = 0;
-            else if (this.direction === 'right') row = 1;
-            else if (this.direction === 'up') row = 2;
-            else if (this.direction === 'left') row = 3;
+            let cols = 4;
+            let rows = 4;
+            let animFrames = 4;
+            let flip = false;
 
-            const frameWidth = heroSprite.width / 4;
-            const frameHeight = heroSprite.height / 4;
+            if (this.character === 'hero_warrior') {
+                cols = 8;
+                rows = 8;
+                animFrames = 8;
+                if (this.direction === 'down') row = 4;
+                else if (this.direction === 'up') row = 5;
+                else if (this.direction === 'right') row = 6;
+                else if (this.direction === 'left') {
+                    row = 6;
+                    flip = true;
+                }
+            } else {
+                if (this.direction === 'down') row = 0;
+                else if (this.direction === 'right') row = 1;
+                else if (this.direction === 'up') row = 2;
+                else if (this.direction === 'left') row = 3;
+            }
+
+            const frameWidth = heroSprite.width / cols;
+            const frameHeight = heroSprite.height / rows;
+            const currentFrame = this.animFrame % animFrames;
+
+            ctx.save();
+            let finalDrawX = drawX;
+            let finalDrawY = drawY;
+            if (flip) {
+                ctx.translate(drawX + CONSTANTS.TILE_SIZE / 2, drawY + CONSTANTS.TILE_SIZE / 2);
+                ctx.scale(-1, 1);
+                finalDrawX = -CONSTANTS.TILE_SIZE / 2;
+                finalDrawY = -CONSTANTS.TILE_SIZE / 2;
+            }
 
             ctx.drawImage(
                 heroSprite,
-                this.animFrame * frameWidth, row * frameHeight, frameWidth, frameHeight,
-                drawX, drawY,
+                currentFrame * frameWidth, row * frameHeight, frameWidth, frameHeight,
+                finalDrawX, finalDrawY,
                 CONSTANTS.TILE_SIZE, CONSTANTS.TILE_SIZE
             );
+            ctx.restore();
         } else if (this.character === 'hero_sasuke') {
             this.drawProceduralSasuke(ctx);
         } else {

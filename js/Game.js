@@ -607,7 +607,11 @@ class Game {
                 this.state = CONSTANTS.STATE_PLAYING;
                 if (this.player) {
                     this.player.keys.action = false;
-                    this.player.actionPressed = true;
+                    this.player.keys.up = false;
+                    this.player.keys.down = false;
+                    this.player.keys.left = false;
+                    this.player.keys.right = false;
+                    this.player.actionPressed = false;
                 }
                 if (levelNum === 5) {
                     window.soundManager?.startBGM('boss');

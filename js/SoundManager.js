@@ -230,6 +230,26 @@ class SoundManager {
         this.playTone(180, 'sine', 0.15, 0.2, 0.01);
     }
 
+    playBombPlant() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.exponentialRampToValueAtTime(110, now + 0.12);
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.14);
+        } catch (e) {}
+    }
+
     playExplosion() {
         if (!this.enabled) return;
         this.init();
@@ -510,6 +530,25 @@ class SoundManager {
                 this.playTone(n.f, 'triangle', n.d, 0.22, 0.01);
             }, offset * 1000);
             offset += n.d * 0.8;
+        });
+    }
+
+    playLevelClear() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [
+            { f: 523.25, d: 0.1 },
+            { f: 659.25, d: 0.1 },
+            { f: 783.99, d: 0.1 },
+            { f: 1046.5, d: 0.25 }
+        ];
+        let offset = 0;
+        notes.forEach((n) => {
+            setTimeout(() => {
+                this.playTone(n.f, 'square', n.d, 0.14, 0.01);
+            }, offset * 1000);
+            offset += n.d * 0.75;
         });
     }
 

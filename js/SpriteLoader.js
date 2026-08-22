@@ -4,15 +4,18 @@ class SpriteLoader {
         this.sprites = {}; // Imagens com Chroma Key aplicado e prontas
     }
 
-    loadImage(name, src, useWhiteKey = false) {
+    loadImage(name, src, chromaType = 'green') {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = "Anonymous";
             img.onload = () => {
                 this.rawImages[name] = img;
-                const processed = useWhiteKey
-                    ? this.applyWhiteChromaKey(img)
-                    : this.applyChromaKey(img);
+                let processed = img;
+                if (chromaType === 'white') {
+                    processed = this.applyWhiteChromaKey(img);
+                } else if (chromaType === 'green') {
+                    processed = this.applyChromaKey(img);
+                }
                 this.sprites[name] = processed;
                 resolve(processed);
             };
@@ -29,7 +32,7 @@ class SpriteLoader {
             { name: 'hero', src: 'assets/hero.jpg' },
             { name: 'hero_naruto', src: 'assets/hero_naruto.jpg' },
             { name: 'hero_sasuke', src: 'assets/hero_sasuke.jpg' },
-            { name: 'hero_warrior', src: 'assets/char_a_p1_0bas_humn_v00.png', whiteKey: true },
+            { name: 'hero_warrior', src: 'assets/char_a_p1_0bas_humn_v00.png', chromaType: 'none' },
             { name: 'enemy', src: 'assets/enemy.jpg' },
             { name: 'enemy_blue', src: 'assets/enemy_blue.jpg' },
             { name: 'enemy_orange', src: 'assets/enemy_orange.jpg' },
@@ -43,7 +46,7 @@ class SpriteLoader {
         ];
 
         for (let item of list) {
-            await this.loadImage(item.name, item.src, item.whiteKey || false);
+            await this.loadImage(item.name, item.src, item.chromaType || (item.whiteKey ? 'white' : 'green'));
         }
         return this.sprites;
     }
